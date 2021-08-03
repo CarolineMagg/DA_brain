@@ -23,7 +23,7 @@ class DataSet2DUnpaired(DataSet2D):
                  input_data="t1", input_name="image",
                  output_data="t2", output_name="image_output",
                  shuffle=True, p_augm=0.0, use_filter=None,
-                 dsize=(256, 256)):
+                 dsize=(256, 256), alpha=0, beta=255):
         """
         Create a new DataSet2D object.
         :param dataset_folder: path to dataset folder
@@ -35,6 +35,8 @@ class DataSet2DUnpaired(DataSet2D):
         :param shuffle: boolean for shuffle the indices
         :param use_filter: use structure for filtering
         :param dsize: image size
+        :param alpha: alpha values of images (lower boundary of pixel intensity range)
+        :param beta: beta values of images (upper boundary of pixel intensity range)
 
         Examples:
         # Dataset for adversarial learning with input t1 and output t2
@@ -49,7 +51,7 @@ class DataSet2DUnpaired(DataSet2D):
         super(DataSet2DUnpaired, self).__init__(dataset_folder, batch_size=batch_size,
                                                 input_data=input_data, input_name=input_name,
                                                 shuffle=shuffle, p_augm=p_augm, use_filter=use_filter,
-                                                dsize=dsize)
+                                                dsize=dsize, alpha=alpha, beta=beta)
 
         # output data
         self._output_name = output_name if type(output_name) == list else [output_name]

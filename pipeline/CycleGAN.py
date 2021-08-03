@@ -72,22 +72,16 @@ class CycleGAN:
         logging.info("CycleGAN: loading data ...")
         self.train_set = DataSet2DUnpaired(os.path.join(self.dir_data, "training"), input_data=["t1"],
                                            input_name=["image"], output_data="t2", output_name="generated_t2",
-                                           batch_size=1, shuffle=True, p_augm=0.0)
-        self.train_set.reduce_to_nonzero_segm("vs")
-        self.train_set.reset()
+                                           batch_size=1, shuffle=True, p_augm=0.0, alpha=-1, beta=1, use_filter="vs")
         self.val_set = DataSet2DUnpaired(os.path.join(self.dir_data, "validation"), input_data=["t1"],
                                          input_name=["image"], output_data="t2", output_name="generated_t2",
-                                         batch_size=1, shuffle=True, p_augm=0.0)
-        self.val_set.reduce_to_nonzero_segm("vs")
-        self.val_set.reset()
+                                         batch_size=1, shuffle=True, p_augm=0.0, alpha=-1, beta=1, use_filter="vs")
 
         logging.info("CycleGAN: training {0}, validation {1}".format(len(self.train_set), len(self.val_set)))
 
         self.test_set = DataSet2DUnpaired(os.path.join(self.dir_data, "test"), input_data=["t1"],
                                           input_name=["image"], output_data="t2", output_name="generated_t2",
-                                          batch_size=1, shuffle=False, p_augm=0.0)
-        self.test_set.reduce_to_nonzero_segm("vs")
-        self.test_set.reset()
+                                          batch_size=1, shuffle=False, p_augm=0.0, alpha=-1, beta=1, use_filter="vs")
 
         logging.info("CycleGAN: test {0}".format(len(self.test_set)))
 
@@ -291,7 +285,7 @@ class CycleGAN:
                     img = np.hstack(
                         np.concatenate([tf.expand_dims(A, -1), A2B, A2B2A, tf.expand_dims(B, -1), B2A, B2A2B], axis=0))
                     img = cv2.normalize(img, img, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
-                    cv2.imwrite(os.path.join(self.dir_sample, 'iter-%03d-%09d.jpg' % (epoch, idx)),
+                    cv2.imwrite(os.path.join(self.dir_sample, 'iter-%03d-%05d.jpg' % (epoch, idx)),
                                 img)
                     sample_counter = sample_counter + 1
                     if sample_counter >= len(self.val_set):

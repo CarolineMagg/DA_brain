@@ -26,7 +26,7 @@ class DataSet2D(tf.keras.utils.Sequence):
     def __init__(self, dataset_folder, batch_size=4,
                  input_data="t1", input_name="image",
                  shuffle=True, p_augm=0.0, use_filter=None,
-                 dsize=(256, 256)):
+                 dsize=(256, 256), alpha=0, beta=255):
         """
         Create a new DataSet2D object.
         :param dataset_folder: path to dataset folder
@@ -35,6 +35,8 @@ class DataSet2D(tf.keras.utils.Sequence):
         :param shuffle: boolean for shuffle the indices
         :param use_filter: use structure for filtering
         :param dsize: image size
+        :param alpha: alpha values of images (lower boundary of pixel intensity range)
+        :param beta: beta values of images (upper boundary of pixel intensity range)
         """
 
         # dataset folder
@@ -58,6 +60,8 @@ class DataSet2D(tf.keras.utils.Sequence):
         self._input_data = input_data if type(input_data) == list else [input_data]
         assert len(self._input_data) == len(self._input_name)
 
+        self._alpha = alpha
+        self._beta = beta
         self._dsize = dsize
         self._p_augm = p_augm
         self._augm_methods = [
@@ -218,7 +222,7 @@ class DataSet2D(tf.keras.utils.Sequence):
         """
         image_keys = [k for k, v in self.lookup_data_augmentation().items() if v == 'image']
         for k in image_keys:
-            data[k] = cv2.normalize(data[k], None, alpha=-1, beta=1, norm_type=cv2.NORM_MINMAX)
+            data[k] = cv2.normalize(data[k], None, alpha=self._alpha, beta=self._beta, norm_type=cv2.NORM_MINMAX)
         return data
 
     def _load_data(self):
