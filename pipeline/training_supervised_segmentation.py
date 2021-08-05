@@ -26,7 +26,6 @@ parser.add_argument('--activation', dest='activation', default="relu",
 parser.add_argument('--seed', dest='seed', default=1334, type=int,
                     help='set seed for model init')
 
-
 args = parser.parse_args()
 
 if __name__ == "__main__":
@@ -46,7 +45,7 @@ if __name__ == "__main__":
         print("Training vs with t1.")
 
         # dataset
-        train_set = DataSet2DPaired("../../data/VS_segm/VS_registered/training/", input_data=["t1"],
+        train_set = DataSet2DPaired("/tf/workdir/data/VS_segm/VS_registered/training/", input_data=["t1"],
                                     input_name=["image"], output_data="vs", output_name="vs", batch_size=batch_size,
                                     shuffle=True, use_filter="vs", dsize=dsize, p_augm=0.0)
         train_set.augm_methods = [
@@ -56,10 +55,10 @@ if __name__ == "__main__":
                      A.MedianBlur(p=0.5, blur_limit=5),
                      A.MotionBlur(p=0.5, blur_limit=(3, 5))], p=0.5)
         ]
-        val_set = DataSet2DPaired("../../data/VS_segm/VS_registered/validation/", input_data=["t1"],
+        val_set = DataSet2DPaired("/tf/workdir/data/VS_segm/VS_registered/validation/", input_data=["t1"],
                                   input_name=["image"], output_data="vs", output_name="vs", batch_size=batch_size,
                                   shuffle=True, use_filter="vs", dsize=dsize, p_augm=0.0)
-        test_set = DataSet2DPaired("../../data/VS_segm/VS_registered/test/", input_data=["t1"],
+        test_set = DataSet2DPaired("/tf/workdir/data/VS_segm/VS_registered/test/", input_data=["t1"],
                                    input_name=["image"], output_data="vs", output_name="vs", batch_size=batch_size,
                                    shuffle=False, use_filter="vs", dsize=dsize, p_augm=0.0)
 
@@ -71,7 +70,7 @@ if __name__ == "__main__":
         print("Training vs with t2.")
 
         # dataset
-        train_set = DataSet2DPaired("../../data/VS_segm/VS_registered/training/", input_data=["t2"],
+        train_set = DataSet2DPaired("/tf/workdir/data/VS_segm/VS_registered/training/", input_data=["t2"],
                                     input_name=["image"], output_data="vs", output_name="vs", batch_size=batch_size,
                                     shuffle=True, use_filter="vs", dsize=dsize, p_augm=0.0)
         train_set.augm_methods = [
@@ -81,10 +80,10 @@ if __name__ == "__main__":
                      A.MedianBlur(p=0.5, blur_limit=5),
                      A.MotionBlur(p=0.5, blur_limit=(3, 5))], p=0.5)
         ]
-        val_set = DataSet2DPaired("../../data/VS_segm/VS_registered/validation/", input_data=["t2"],
+        val_set = DataSet2DPaired("/tf/workdir/data/VS_segm/VS_registered/validation/", input_data=["t2"],
                                   input_name=["image"], output_data="vs", output_name="vs", batch_size=batch_size,
                                   shuffle=True, use_filter="vs", dsize=dsize, p_augm=0.0)
-        test_set = DataSet2DPaired("../../data/VS_segm/VS_registered/test/", input_data=["t2"],
+        test_set = DataSet2DPaired("/tf/workdir/data/VS_segm/VS_registered/test/", input_data=["t2"],
                                    input_name=["image"], output_data="vs", output_name="vs", batch_size=batch_size,
                                    shuffle=False, use_filter="vs", dsize=dsize, p_augm=0.0)
 
@@ -96,7 +95,7 @@ if __name__ == "__main__":
         print("Training vs with t1 and t2.")
 
         # dataset
-        train_set = DataSet2DPaired("../../data/VS_segm/VS_registered/training/", input_data=["t1", "t2"],
+        train_set = DataSet2DPaired("/tf/workdir/data/VS_segm/VS_registered/training/", input_data=["t1", "t2"],
                                     input_name=["image", "t2"], output_data="vs", output_name="vs",
                                     batch_size=batch_size,
                                     shuffle=True, use_filter="vs", dsize=dsize, p_augm=0.0)
@@ -107,10 +106,10 @@ if __name__ == "__main__":
                      A.MedianBlur(p=0.5, blur_limit=5),
                      A.MotionBlur(p=0.5, blur_limit=(3, 5))], p=0.5)
         ]
-        val_set = DataSet2DPaired("../../data/VS_segm/VS_registered/validation/", input_data=["t1", "t2"],
+        val_set = DataSet2DPaired("/tf/workdir/data/VS_segm/VS_registered/validation/", input_data=["t1", "t2"],
                                   input_name=["image", "t2"], output_data="vs", output_name="vs", batch_size=batch_size,
                                   shuffle=True, use_filter="vs", dsize=dsize, p_augm=0.0)
-        test_set = DataSet2DPaired("../../data/VS_segm/VS_registered/test/", input_data=["t1", "t2"],
+        test_set = DataSet2DPaired("/tf/workdir/data/VS_segm/VS_registered/test/", input_data=["t1", "t2"],
                                    input_name=["image", "t2"], output_data="vs", output_name="vs",
                                    batch_size=batch_size,
                                    shuffle=False, use_filter="vs", dsize=dsize, p_augm=0.0)
@@ -122,16 +121,13 @@ if __name__ == "__main__":
     else:
         raise ValueError("training not valid.")
 
-    # callbacks
-    identifier = f"{model_type}_{training}_segm_Aug02"
+    # directory names
+    identifier = f"{model_type}_{training}_segm_{seed}"
+    save_model = f"/tf/workdir/DA_brain/saved_models/{identifier}/{identifier}.hdf5"
+    tensorboard_dir = f"/tf/workdir/DA_brain/logs/{identifier}"
 
-    pipeline = SimpleSegmentation(identifier)
+    # start the pipeline
+    pipeline = SimpleSegmentation(save_model_dir=save_model, tensorboard_dir=tensorboard_dir)
     pipeline.set_model(model)
     pipeline.set_data(train_set, val_set, test_set)
-
-    pipeline.fit(init_epoch=0, epochs=2)
-
-    pipeline.train_set.p_augm = 0.5
-    pipeline.fit(init_epoch=2, epochs=3)
-
-    pipeline.evaluate()
+    pipeline.run(True, [0, 100, 150])
