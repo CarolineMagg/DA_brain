@@ -22,8 +22,24 @@ from pipeline.Checkpoint import Checkpoint
 
 class CycleGAN:
 
-    def __init__(self, data_dir, tensorboard_dir, checkpoints_dir, save_model_dir="saved_models",
-                 sample_dir="sample_dir", seed=13375):
+    def __init__(self, data_dir, tensorboard_dir, checkpoints_dir, save_model_dir, sample_dir,
+                 seed=13375, d_step=1, sample_step=500,
+                 cycle_loss_weight=10.0, identity_loss_weight=1.0,
+                 dsize=(256, 256)):
+        """
+        CycleGan Pipeline
+        :param data_dir: directory for data (needs to contain a training/test/validation folder
+        :param tensorboard_dir: directory for tensorboard logging
+        :param checkpoints_dir: directory for checkpoints
+        :param save_model_dir: directory for saved models
+        :param sample_dir: directory for samples
+        :param seed: random seed
+        :param d_step: discriminator will be trained each d_step
+        :param sample_step: sample from validator will be created each sample_step
+        :param cycle_loss_weight: weight for the cycle loss
+        :param identity_loss_weight: weight for the identity loss
+        :param dsize: image size
+        """
 
         # random seed
         tf.random.set_seed(seed)
@@ -39,6 +55,13 @@ class CycleGAN:
             logging.info(f"CycleGan: create {sample_dir}.")
             os.makedirs(sample_dir)
 
+        # parameters
+        self.cycle_loss_weight = cycle_loss_weight
+        self.identity_loss_weight = identity_loss_weight
+        self.d_step = d_step
+        self.sample_step = sample_step
+        self.dsize = dsize
+
         # data
         self.train_set = None
         self.val_set = None
@@ -46,12 +69,12 @@ class CycleGAN:
         self._load_data()
 
         # generator
-        self.G_S2T = ResnetGenerator(n_blocks=9).generate_model()
-        self.G_T2S = ResnetGenerator(n_blocks=9).generate_model()
+        self.G_S2T = ResnetGenerator(n_blocks=9, input_shape=(*self.dsize, 1)).generate_model()
+        self.G_T2S = ResnetGenerator(n_blocks=9, input_shape=(*self.dsize, 1)).generate_model()
 
         # discriminator
-        self.D_S = ConvDiscriminator().generate_model()
-        self.D_T = ConvDiscriminator().generate_model()
+        self.D_S = ConvDiscriminator(input_shape=(*self.dsize, 1)).generate_model()
+        self.D_T = ConvDiscriminator(input_shape=(*self.dsize, 1)).generate_model()
 
         # optimizer
         self.G_optimizer = tf.keras.optimizers.Adam(learning_rate=0.0002, beta_1=0.5)
@@ -69,26 +92,48 @@ class CycleGAN:
         self.train_summary_writer = None
 
     def _load_data(self):
+        """
+        Load data from training/validation/test folder with batch size 1, no augm and pixel value range [-1,1].
+        Use only data where segmentation is available to ensure tumor presents.
+        Training data - with shuffle, unpaired
+        Validation data - with shuffle, paired
+        Test data - without shuffle, paired
+        """
         logging.info("CycleGAN: loading data ...")
         self.train_set = DataSet2DUnpaired(os.path.join(self.dir_data, "training"), input_data=["t1"],
                                            input_name=["image"], output_data="t2", output_name="generated_t2",
-                                           batch_size=1, shuffle=True, p_augm=0.0, alpha=-1, beta=1, use_filter="vs")
+                                           batch_size=1, shuffle=True, p_augm=0.0, alpha=-1, beta=1, use_filter="vs",
+                                           dsize=self.dsize)
         self.val_set = DataSet2DUnpaired(os.path.join(self.dir_data, "validation"), input_data=["t1"],
                                          input_name=["image"], output_data="t2", output_name="generated_t2",
-                                         batch_size=1, shuffle=True, p_augm=0.0, alpha=-1, beta=1, use_filter="vs")
-
+                                         batch_size=1, shuffle=True, p_augm=0.0, alpha=-1, beta=1, use_filter="vs",
+                                         dsize=self.dsize)
+        self.val_set._unpaired = False
+        self.val_set.reset()
         logging.info("CycleGAN: training {0}, validation {1}".format(len(self.train_set), len(self.val_set)))
 
         self.test_set = DataSet2DUnpaired(os.path.join(self.dir_data, "test"), input_data=["t1"],
                                           input_name=["image"], output_data="t2", output_name="generated_t2",
-                                          batch_size=1, shuffle=False, p_augm=0.0, alpha=-1, beta=1, use_filter="vs")
+                                          batch_size=1, shuffle=False, p_augm=0.0, alpha=-1, beta=1, use_filter="vs",
+                                          dsize=self.dsize)
+        self.test_set._unpaired = False
+        self.test_set.reset()
 
         logging.info("CycleGAN: test {0}".format(len(self.test_set)))
 
     @tf.function
     def _train_generator(self, S, T):
-        cycle_loss_weight = 10.0
-        identity_loss_weight = 1.0
+        """
+        Generator training consists of the following steps (always for both domains):
+        1) generator training: G_S2T(S) = T_
+        2) cycle: G_T2S(T_) = S_
+        3) identity: G_T2S(S) = S_
+        4) loss calculation:
+            - adversarial loss: based on D decision
+            - cycle consistency loss: how similar are S and S_ from generator cycle
+            - identity loss: how similar are S and S_ from identity
+        5) update gradients
+        """
         with tf.GradientTape() as tape:
             # generator
             S2T = self.G_S2T(S, training=True)
@@ -119,8 +164,8 @@ class CycleGAN:
             T2T_id_loss = identity_loss(T, T2T)
 
             # totSl loss
-            G_loss = (S2T_g_loss + T2S_g_loss) + (S2T2S_c_loss + T2S2T_c_loss) * cycle_loss_weight + (
-                    S2S_id_loss + T2T_id_loss) * identity_loss_weight
+            G_loss = (S2T_g_loss + T2S_g_loss) + (S2T2S_c_loss + T2S2T_c_loss) * self.cycle_loss_weight + (
+                    S2S_id_loss + T2T_id_loss) * self.identity_loss_weight
 
         # calc and update gradients
         G_grad = tape.gradient(G_loss, self.G_S2T.trainable_variables + self.G_T2S.trainable_variables)
@@ -135,6 +180,14 @@ class CycleGAN:
 
     @tf.function
     def _train_discriminator(self, S, T, S2T, T2S):
+        """
+        Discriminator training consists of the following steps (always for both domains):
+        1) discriminator training real: D_S(S) = S_real
+        2) discriminator training fake: D_S(T2S) = S_fake
+        3) loss calculation:
+            - adversarial loss: compare the real to ones and fakes to zeros and weight the loss
+        4) update gradients
+        """
         with tf.GradientTape() as tape:
             S_d_logits = self.D_S(S, training=True)  # real
             T2S_d_logits = self.D_S(T2S, training=True)  # fake
@@ -154,6 +207,12 @@ class CycleGAN:
                 'T_d_loss': T_d_loss}
 
     def train_step(self, S, T, step, D_loss_dict):
+        """
+        One training step:
+        1) train generators
+        2) chose fake images from a pool (and fill pool with new generated images)
+        3) train discriminator (for special number of steps, eg every 10th step, discriminator is trained)
+        """
         # train generator
         S2T, T2S, G_loss_dict = self._train_generator(S, T)
 
@@ -163,7 +222,7 @@ class CycleGAN:
         self._num_fake += 1
 
         # train descriminator
-        if step % 10 == 0:
+        if step % self.d_step == 0:
             D_loss_dict = self._train_discriminator(S, T, S2T_fake, T2S_fake)
 
         return G_loss_dict, D_loss_dict
@@ -187,10 +246,16 @@ class CycleGAN:
                 return fake
 
     def _init_summary_file_writer(self, directory=os.path.join("logs", "train")):
+        """
+        Initialize the tensorboard summary file writer.
+        """
         logging.info("CycleGAN: set up summary file writer with directory {}.".format(directory))
         self.train_summary_writer = tf.summary.create_file_writer(directory)
 
     def _init_checkpoint(self, directory=os.path.join("tmp", 'checkpoints'), restore=True):
+        """
+        Initialize the model checkpoints.
+        """
         logging.info("CycleGAN: set up checkpoints with directory {}.".format(directory))
         self.checkpoint = Checkpoint(dict(G_S2T=self.G_S2T,
                                           G_T2S=self.G_T2S,
@@ -235,6 +300,9 @@ class CycleGAN:
 
     @tf.function
     def sample(self, S, T):
+        """
+        Generate samples from current generators.
+        """
         S2T = self.G_S2T(S, training=False)
         T2S = self.G_T2S(T, training=False)
         S2T2S = self.G_T2S(S2T, training=False)
@@ -242,6 +310,20 @@ class CycleGAN:
         return S2T, T2S, S2T2S, T2S2T
 
     def train(self, epochs=50, data_nr=None, restore=True):
+        """
+        Train CycleGAN pipeline:
+        1) initialize local variables
+        2) initialize tensorboard file writer and checkpoints
+        3) for each epoch:
+            for each step:
+                draw next batch from training data
+                perform training step
+                collect the losses
+                if sample generation step: generate sample
+            write tensorboard summary
+            save checkpoint
+        4) save model
+        """
         logging.info("CycleGAN: set up training.")
         G_loss_dict_list = {k: 0 for k in ['S2T_g_loss', 'T2S_g_loss', 'S2T2S_cycle_loss', 'T2S2T_cycle_loss',
                                            'S2S_id_loss', 'T2T_id_loss']}
@@ -277,7 +359,7 @@ class CycleGAN:
                 self.train_set.reset()
                 G_loss_dict_list, D_loss_dict_list = self._collect_losses(G_loss_dict, D_loss_dict, G_loss_dict_list,
                                                                           D_loss_dict_list)
-                if idx % 500 == 0:
+                if idx % self.sample_step == 0:
                     A, B = self.val_set[sample_counter]
                     A = A["image"]
                     B = B["generated_t2"]
