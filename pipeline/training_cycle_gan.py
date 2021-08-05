@@ -3,11 +3,10 @@ import sys
 import os
 import argparse
 
-from pipeline.CycleGAN import CycleGAN
-
 parent = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, parent)
 
+from pipeline.CycleGAN import CycleGAN
 from models.utils import check_gpu
 
 parser = argparse.ArgumentParser(description='Process supervised segm pipeline parameters.')
@@ -33,18 +32,14 @@ args = parser.parse_args()
 if __name__ == "__main__":
     check_gpu()
 
-    training = args.training  # args.training
-    module = importlib.import_module("models")
-    model_type = args.model
-    model_class = getattr(module, model_type)
-    print(f"Training with {model_type}.")
+    print(f"Training with CycleGAN.")
     seed = args.seed
     d_step = args.d_step
     dsize = args.dsize
     sample_step = args.sample_step
     cycle_consistency_loss = args.cycle_loss_weight
     identity_loss = args.identity_loss_weight
-    epochs = args.epoch
+    epochs = args.epochs
     data_nr = args.data_nr if args.data_nr != 0 else None
 
     tensorboard_dir = "/tf/workdir/DA_brain/logs/gan_{}/".format(seed)
