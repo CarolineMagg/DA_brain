@@ -14,8 +14,14 @@ __author__ = "c.magg"
 
 
 def plot_predictions_overlap(inputs, targets, predictions):
-    images = inputs[list(inputs.keys())[0]]
-    gt = targets[list(targets.keys())[0]]
+    if type(inputs) == dict:
+        images = inputs[list(inputs.keys())[0]]
+    else:
+        images = inputs
+    if type(targets) == dict:
+        gt = targets[list(targets.keys())[0]]
+    else:
+        gt = targets
     nrows = np.shape(images)[0]  # batch_size
     ncols = 2  # GT and Pred
     fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(25, 25))
@@ -27,10 +33,40 @@ def plot_predictions_overlap(inputs, targets, predictions):
             axes[row, col].set_title("GT")
             axes[row, col].axis("off")
 
-            axes[row, col+1].imshow(images[counter], cmap="gray")
-            axes[row, col+1].imshow(predictions[counter], alpha=0.5)
-            axes[row, col+1].set_title("Prediction")
-            axes[row, col+1].axis("off")
+            axes[row, col + 1].imshow(images[counter], cmap="gray")
+            axes[row, col + 1].imshow(predictions[counter], alpha=0.5)
+            axes[row, col + 1].set_title("Prediction")
+            axes[row, col + 1].axis("off")
+            counter += 1
+    plt.show()
+
+
+def plot_predictions_separate(inputs, targets, predictions):
+    if type(inputs) == dict:
+        images = inputs[list(inputs.keys())[0]]
+    else:
+        images = inputs
+    if type(targets) == dict:
+        gt = targets[list(targets.keys())[0]]
+    else:
+        gt = targets
+    nrows = np.shape(images)[0]  # batch_size
+    ncols = 3  # Input, GT and prediction
+    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(25, 25))
+    counter = 0
+    for row in range(nrows):
+        for col in range(0, ncols, 3):
+            axes[row, col].imshow(images[counter], cmap="gray")
+            axes[row, col].set_title("Input")
+            axes[row, col].axis("off")
+
+            axes[row, col + 1].imshow(gt[counter], cmap="gray")
+            axes[row, col + 1].set_title("GT")
+            axes[row, col + 1].axis("off")
+
+            axes[row, col + 2].imshow(predictions[counter], cmap="gray")
+            axes[row, col + 2].set_title("Prediction")
+            axes[row, col + 2].axis("off")
             counter += 1
     plt.show()
 
@@ -237,4 +273,3 @@ def plot_gen_overlap(batch, nrows=4, ncols=2, use_random=True):
             counter += 1
     fig.suptitle("Batch plot overlap.", fontsize=16)
     plt.show()
-
