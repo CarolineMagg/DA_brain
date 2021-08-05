@@ -11,7 +11,7 @@ __author__ = "c.magg"
 
 class SimpleSegmentation:
 
-    def __init__(self, tensorboard_dir, save_model_dir):
+    def __init__(self, tensorboard_dir, checkpoint_dir, save_model_dir):
         """
         SimpleSegmentation pipeline
         :param tensorboard_dir: directory for tensorboard logging
@@ -24,6 +24,7 @@ class SimpleSegmentation:
 
         # callbacks
         self.callbacks = []
+        self.dir_checkpoint = checkpoint_dir
         self.dir_save_model = save_model_dir
         self.dir_tb = tensorboard_dir
         self.set_callbacks()
@@ -43,7 +44,7 @@ class SimpleSegmentation:
         """
         earlystop = tf.keras.callbacks.EarlyStopping(monitor="val_loss", min_delta=0, patience=20, verbose=1,
                                                      mode='min')
-        checkpoint = tf.keras.callbacks.ModelCheckpoint(self.dir_save_model, monitor="val_loss", verbose=1,
+        checkpoint = tf.keras.callbacks.ModelCheckpoint(self.dir_checkpoint, monitor="val_loss", verbose=1,
                                                         save_best_only=True, save_weights_only=False)
         tensorboard = tf.keras.callbacks.TensorBoard(log_dir=self.dir_tb)
 
@@ -95,7 +96,7 @@ class SimpleSegmentation:
         Perform model evaluation on validation and test set with latest model.
         """
         logging.info("SimpleSegmentation: evaluation ....")
-        self.model.load_weights(self.dir_save_model)
+        self.model.load_weights(self.dir_checkpoint)
         self.model.evaluate(self.val_set)
         self.model.evaluate(self.test_set)
 
@@ -122,3 +123,5 @@ class SimpleSegmentation:
             self.fit(init_epoch=epochs[1], epochs=epochs[2])
 
         self.evaluate()
+        # self.model.load_weights(self.dir_checkpoint)
+        # self.model.save(self.dir_save_model)

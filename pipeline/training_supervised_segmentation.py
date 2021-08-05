@@ -123,11 +123,14 @@ if __name__ == "__main__":
 
     # directory names
     identifier = f"{model_type}_{training}_segm_{seed}"
-    save_model = f"/tf/workdir/DA_brain/saved_models/{identifier}/{identifier}.hdf5"
+    save_model = f"/tf/workdir/DA_brain/saved_models/{identifier}"
+    checkpoint_hdf5 = f"/tf/workdir/DA_brain/saved_models/{identifier}/{identifier}.hdf5"
     tensorboard_dir = f"/tf/workdir/DA_brain/logs/{identifier}"
 
     # start the pipeline
-    pipeline = SimpleSegmentation(save_model_dir=save_model, tensorboard_dir=tensorboard_dir)
+    pipeline = SimpleSegmentation(save_model_dir=save_model,
+                                  checkpoint_dir=checkpoint_hdf5,
+                                  tensorboard_dir=tensorboard_dir)
     pipeline.set_model(model)
     pipeline.set_data(train_set, val_set, test_set)
     pipeline.run(True, [0, 100, 150])
