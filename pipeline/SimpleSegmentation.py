@@ -123,5 +123,6 @@ class SimpleSegmentation:
             self.fit(init_epoch=epochs[1], epochs=epochs[2])
 
         self.evaluate()
-        # self.model.load_weights(self.dir_checkpoint)
-        # self.model.save(self.dir_save_model)
+
+        self.model.load_weights(self.dir_checkpoint)
+        self.model.save(self.dir_save_model)

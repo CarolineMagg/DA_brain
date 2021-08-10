@@ -11,7 +11,7 @@ class DiceCoefficient(tf.keras.losses.Loss):
     Dice Coefficient
     """
 
-    def __init__(self, smooth=1, name="dice_coeff"):
+    def __init__(self, smooth=1, name="dice_coeff", **kwargs):
         super().__init__(name=name)
         self.smooth = smooth
 
@@ -24,7 +24,7 @@ class DiceLoss(tf.keras.losses.Loss):
     Dice Coefficient Loss = 1 - DC
     """
 
-    def __init__(self, smooth=1, name="dice_loss"):
+    def __init__(self, smooth=1, name="dice_loss", **kwargs):
         super().__init__(name=name)
         self.smooth = smooth
 
