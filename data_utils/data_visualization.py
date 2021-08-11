@@ -13,7 +13,7 @@ from data_utils.data_loader import load_data_from_folder, get_non_zero_slices_se
 __author__ = "c.magg"
 
 
-def plot_predictions_overlap(inputs, targets, predictions, figsize=(10, 10)):
+def plot_predictions_overlap(inputs, targets, predictions, figsize=(20, 20)):
     if type(inputs) == dict:
         images = inputs[list(inputs.keys())[0]]
     else:
@@ -65,6 +65,39 @@ def plot_predictions_separate(inputs, targets, predictions, figsize=(20, 20)):
             axes[row, col + 1].axis("off")
 
             axes[row, col + 2].imshow(predictions[counter], cmap="gray")
+            axes[row, col + 2].set_title("Prediction")
+            axes[row, col + 2].axis("off")
+            counter += 1
+    plt.show()
+
+
+def plot_predictions_separate_overlap(inputs, targets, predictions, segm_gt, segm_pred, figsize=(20, 20)):
+    if type(inputs) == dict:
+        images = inputs[list(inputs.keys())[0]]
+    else:
+        images = inputs
+    if type(targets) == dict:
+        gt = targets[list(targets.keys())[0]]
+    else:
+        gt = targets
+    nrows = np.shape(images)[0]  # batch_size
+    ncols = 3  # Input, GT and prediction
+    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize)
+    counter = 0
+    for row in range(nrows):
+        for col in range(0, ncols, 3):
+            axes[row, col].imshow(images[counter], cmap="gray")
+            axes[row, col].imshow(segm_gt[counter], alpha=0.5)
+            axes[row, col].set_title("Input")
+            axes[row, col].axis("off")
+
+            axes[row, col + 1].imshow(gt[counter], cmap="gray")
+            axes[row, col + 1].imshow(segm_gt[counter], alpha=0.5)
+            axes[row, col + 1].set_title("GT")
+            axes[row, col + 1].axis("off")
+
+            axes[row, col + 2].imshow(predictions[counter], cmap="gray")
+            axes[row, col + 2].imshow(segm_pred[counter], alpha=0.5)
             axes[row, col + 2].set_title("Prediction")
             axes[row, col + 2].axis("off")
             counter += 1

@@ -6,7 +6,7 @@ import tensorflow as tf
 import numpy as np
 from heapq import nlargest, nsmallest
 
-from data_utils.data_visualization import plot_predictions_overlap, plot_predictions_separate
+from data_utils.data_visualization import plot_predictions_separate_overlap
 from losses.dice import DiceLoss, DiceCoefficient
 from losses.gan import generator_loss_lsgan
 import medpy.metric as metric
@@ -138,8 +138,7 @@ class InferenceGT2SSegmS:
         assd_top = [assd[k[0]] for k in dice_top]
         print(f"best {k} dice: {dice_top} \nwith assd: {assd_top}")
         if plot:
-            plot_predictions_overlap(inputs, targets, pred)
-            plot_predictions_separate(inputs, targets_gen, inputs_gen)
+            plot_predictions_separate_overlap(inputs, targets_gen, inputs_gen, targets, pred)
 
         # bottom k dice results
         dice_bottom = nsmallest(k, enumerate([d for d in dice]), key=lambda x: x[1])
@@ -151,5 +150,4 @@ class InferenceGT2SSegmS:
         assd_bottom = [assd[k[0]] for k in dice_top]
         print(f"worst {k} dice: {dice_bottom} \nwith assd: {assd_bottom}")
         if plot:
-            plot_predictions_overlap(inputs, targets, pred)
-            plot_predictions_separate(inputs, targets_gen, inputs_gen)
+            plot_predictions_separate_overlap(inputs, targets_gen, inputs_gen, targets, pred)
