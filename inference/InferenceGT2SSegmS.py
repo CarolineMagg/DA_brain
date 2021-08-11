@@ -39,6 +39,7 @@ class InferenceGT2SSegmS:
                                                                     'DiceCoefficient': DiceCoefficient})
         # generate data
         self._data_gen = data_gen
+        self._data_gen.p_augm = 0.0
         self._data_gen._alpha = -1
         self._data_gen._beta = 1
         self._data_gen.shuffle = False

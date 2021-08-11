@@ -29,6 +29,9 @@ class InferenceSimpleSegmentation:
                                                 custom_objects={'DiceLoss': DiceLoss,
                                                                 'DiceCoefficient': DiceCoefficient})
         self.data_gen = data_gen
+        self.data_gen.p_augm = 0.0
+        self.data_gen._alpha = 0
+        self.data_gen._beta = 255
         self.data_gen.shuffle = False
         self.data_gen.reset()
         self._multi_modal = False if len(self.data_gen._input_name) == 1 else True
