@@ -26,6 +26,8 @@ parser.add_argument('--epochs', dest='epochs', default=50, type=int,
                     help='number of epochs')
 parser.add_argument('--data_nr', dest='data_nr', default=0, type=int,
                     help='number of images per epoch/number of steps per epoch')
+parser.add_argument('--step_decay', dest='step_decay', default=0, type=int,
+                    help='epoch to start linear decay')
 
 args = parser.parse_args()
 
@@ -41,6 +43,7 @@ if __name__ == "__main__":
     identity_loss = args.identity_loss_weight
     epochs = args.epochs
     data_nr = args.data_nr if args.data_nr != 0 else None
+    step_decay = args.step_decay if args.step_decay != 0 else None
 
     tensorboard_dir = "/tf/workdir/DA_brain/logs/gan_{}/".format(seed)
     checkpoints_dir = "/tf/workdir/DA_brain/saved_models/gan_{}/checkpoints/".format(seed)
@@ -57,5 +60,5 @@ if __name__ == "__main__":
                         sample_step=sample_step,
                         cycle_loss_weight=cycle_consistency_loss,
                         identity_loss_weight=identity_loss)
-    cyclegan.train(epochs=epochs, data_nr=data_nr, restore=False)
+    cyclegan.train(epochs=epochs, data_nr=data_nr, restore=False, step_decay=step_decay)
 

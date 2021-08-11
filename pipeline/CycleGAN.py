@@ -14,10 +14,10 @@ from data_utils.DataSet2DUnpaired import DataSet2DUnpaired
 from losses.gan import generator_loss_lsgan, cycle_consistency_loss, identity_loss, discriminator_loss_lsgan
 from models.ResnetGenerator import ResnetGenerator
 from models.ConvDiscriminator import ConvDiscriminator
+from pipeline.Checkpoint import Checkpoint
+from pipeline.LinearDecay import LinearDecay
 
 __author__ = "c.magg"
-
-from pipeline.Checkpoint import Checkpoint
 
 
 class CycleGAN:
@@ -77,8 +77,9 @@ class CycleGAN:
         self.D_T = ConvDiscriminator(input_shape=(*self.dsize, 1)).generate_model()
 
         # optimizer
-        self.G_optimizer = tf.keras.optimizers.Adam(learning_rate=0.0002, beta_1=0.5)
-        self.D_optimizer = tf.keras.optimizers.Adam(learning_rate=0.0002, beta_1=0.5)
+        self.G_optimizer = None
+        self.D_optimizer = None
+        self._set_optimizer()
 
         # fake image history
         self._pool_size = 50
@@ -90,6 +91,12 @@ class CycleGAN:
         self.template = "{4}/{5} in {6:.4f} sec - S_d_loss: {0:.5f} - T_d_loss: {1:.5f} - S2T_g_loss: {2:.5f} - T2S_g_loss: {3:.5f}"
         self.checkpoint = None
         self.train_summary_writer = None
+
+    def _set_optimizer(self, total_steps=50000, step_decay=25000):
+        G_lr_scheduler = LinearDecay(0.0002, total_steps, step_decay)
+        D_lr_scheduler = LinearDecay(0.0002, total_steps, step_decay)
+        self.G_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=0.5)
+        self.D_optimizer = tf.keras.optimizers.Adam(learning_rate=D_lr_scheduler, beta_1=0.5)
 
     def _load_data(self):
         """
@@ -163,7 +170,7 @@ class CycleGAN:
             S2S_id_loss = identity_loss(S, S2S)
             T2T_id_loss = identity_loss(T, T2T)
 
-            # totSl loss
+            # total loss
             G_loss = (S2T_g_loss + T2S_g_loss) + (S2T2S_c_loss + T2S2T_c_loss) * self.cycle_loss_weight + (
                     S2S_id_loss + T2T_id_loss) * self.identity_loss_weight
 
@@ -309,12 +316,13 @@ class CycleGAN:
         T2S2T = self.G_S2T(T2S, training=False)
         return S2T, T2S, S2T2S, T2S2T
 
-    def train(self, epochs=50, data_nr=None, restore=True):
+    def train(self, epochs=50, data_nr=None, restore=True, step_decay=None):
         """
         Train CycleGAN pipeline:
         1) initialize local variables
         2) initialize tensorboard file writer and checkpoints
-        3) for each epoch:
+        3) initialize optimizer with LR scheduler
+        4) for each epoch:
             for each step:
                 draw next batch from training data
                 perform training step
@@ -322,9 +330,10 @@ class CycleGAN:
                 if sample generation step: generate sample
             write tensorboard summary
             save checkpoint
-        4) save model
+        5) save model
         """
         logging.info("CycleGAN: set up training.")
+
         G_loss_dict_list = {k: 0 for k in ['S2T_g_loss', 'T2S_g_loss', 'S2T2S_cycle_loss', 'T2S2T_cycle_loss',
                                            'S2S_id_loss', 'T2T_id_loss']}
         D_loss_dict_list = {k: 0 for k in ['S_d_loss', 'T_d_loss']}
@@ -332,6 +341,9 @@ class CycleGAN:
             data_nr = len(self.train_set)
         self._init_summary_file_writer(self.dir_tb)
         self._init_checkpoint(self.dir_cktp, restore=restore)
+        if step_decay is None:
+            step_decay = epochs // 2
+        self._set_optimizer((epochs+1)*data_nr, (step_decay+1)*data_nr)
         sample_counter = 0
 
         D_loss_dict = {'S_d_loss': tf.constant(100.0),
@@ -378,6 +390,9 @@ class CycleGAN:
                     tf.summary.scalar(k, np.mean(v), step=epoch)
                 for k, v in D_loss_dict_list.items():
                     tf.summary.scalar(k, np.mean(v), step=epoch)
+                tf.summary.scalar("learning_rate",
+                                  self.G_optimizer.learning_rate.current_learning_rate,
+                                  step=epoch)
             print(self.template.format(np.mean(D_loss_dict_list["S_d_loss"]),
                                        np.mean(D_loss_dict_list["T_d_loss"]),
                                        np.mean(G_loss_dict_list["S2T_g_loss"]),
