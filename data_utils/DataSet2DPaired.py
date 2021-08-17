@@ -60,6 +60,7 @@ class DataSet2DPaired(DataSet2D):
         # output data
         self._output_name = output_name if type(output_name) == list else [output_name]
         self._output_data = output_data if type(output_data) == list else [output_data]
+        self._mapping_data_name.update({k: v for k, v in zip(self._output_data, self._output_name)})
         assert len(self._output_data) == len(self._output_name)
         if output_data is None:
             self._output_name = None
@@ -126,7 +127,7 @@ class DataSet2DPaired(DataSet2D):
         if self._output_name is not None and self._output_data is not None:
             for output_name, output_data in zip(self._output_name, self._output_data):
                 segm = getattr(self._data[ds], self.lookup_data_call()[output_data])(item)
-                if self._output_name in ["t1", "t2"]:
+                if output_data in ["t1", "t2"]:
                     segm = (segm - np.mean(segm)) / np.std(segm)  # z score normalization
                     segm = cv2.normalize(segm, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
                 segm = cv2.resize(segm, dsize=self._dsize, interpolation=cv2.INTER_CUBIC)

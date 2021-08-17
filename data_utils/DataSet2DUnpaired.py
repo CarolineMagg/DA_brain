@@ -18,7 +18,6 @@ class DataSet2DUnpaired(DataSet2D):
     Only one input and one output are supported!
     """
 
-    # TODO: make dataset unpaired!
     def __init__(self, dataset_folder, batch_size=4,
                  input_data="t1", input_name="image",
                  output_data="t2", output_name="image_output",
@@ -56,6 +55,7 @@ class DataSet2DUnpaired(DataSet2D):
         # output data
         self._output_name = output_name if type(output_name) == list else [output_name]
         self._output_data = output_data if type(output_data) == list else [output_data]
+        self._mapping_data_name.update({k: v for k, v in zip(self._output_data, self._output_name)})
         assert len(self._output_data) == len(self._output_name)
 
         # only one input and one output allowed!

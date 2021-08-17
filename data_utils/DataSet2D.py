@@ -58,6 +58,7 @@ class DataSet2D(tf.keras.utils.Sequence):
         self._batch_size = batch_size
         self._input_name = input_name if type(input_name) == list else [input_name]
         self._input_data = input_data if type(input_data) == list else [input_data]
+        self._mapping_data_name = {k: v for k, v in zip(self._input_data, self._input_name)}
         assert len(self._input_data) == len(self._input_name)
 
         self._alpha = alpha
