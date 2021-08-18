@@ -20,7 +20,6 @@ class DataContainer:
     * segmentation of VS/cochlea
     """
 
-    # TODO: integrate basic pre-processing, cutting intensity range, normalization
     def __init__(self, dir_path):
         """
         Create a new DataContainer object.
@@ -102,15 +101,20 @@ class DataContainer:
     def segm_vs_slice(self, index=None):
         return np.asarray(self._data_vs.dataobj[..., index], dtype=np.int16)
 
+    def segm_vs_class(self, index=None):
+        return 0 if np.sum(self.segm_vs_slice(index)) == 0 else 1
+
     def segm_cochlea_slice(self, index=None):
         return np.asarray(self._data_cochlea.dataobj[..., index],
                           dtype=np.int16) if self._data_cochlea is not None else np.zeros_like(
             self._data_t1.dataobj[..., index])
 
+    def segm_cochlea_class(self, index=None):
+        return 0 if np.sum(self.segm_cochlea_class(index)) == 0 else 1
+
     def get_non_zero_slices_segmentation(self):
         """
         Extract all slices of segmentation that are non-zero.
-        :param segmentation: np.array segmentation mask
         :return: list with non-zero slice indices for VS and cochlea
         """
         img_vs = self.segm_vs

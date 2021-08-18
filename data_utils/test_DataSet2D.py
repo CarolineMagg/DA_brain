@@ -4,9 +4,11 @@ import numpy as np
 
 from data_utils.DataSet2D import DataSet2D
 from data_utils.DataSet2DPaired import DataSet2DPaired
+from data_utils.DataSet2DMixed import DataSet2DMixed
 from data_utils.DataSet2DUnpaired import DataSet2DUnpaired
 
 import logging
+
 logging.basicConfig(level=logging.INFO)
 
 
@@ -263,7 +265,7 @@ class TestDataSet2DPaired(TestCase):
                                         batch_size=4, shuffle=True, p_augm=0.5)
             train_set.reduce_to_nonzero_segm("vs")
             benchmark(train_set)
-        print("Total execution time per iter: ", (time.perf_counter() - start_time)/5)
+        print("Total execution time per iter: ", (time.perf_counter() - start_time) / 5)
         print("DS length ", len(train_set))
 
 
@@ -383,3 +385,157 @@ class TestDataSet2DUnpaired(TestCase):
             benchmark(train_set)
         print("Total execution time per iter: ", (time.perf_counter() - start_time) / 5)
         print("DS length ", len(train_set))
+
+
+class TestDataSet2DSIFA(TestCase):
+
+    def test_init(self):
+        train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data=["t1"],
+                                   input_name=["image"], output_data=["t2", "vs", "vs_class"],
+                                   output_name=["image_t2", "mask", "class1"],
+                                   batch_size=1, shuffle=True)
+        self.assertEqual(1, train_set.batch_size)
+        self.assertEqual(0.0, train_set.p_augm)
+        self.assertEqual((256, 256), train_set.dsize)
+        self.assertEqual(True, train_set.shuffle)
+        self.assertEqual(10450, len(train_set))
+        self.assertListEqual(["image"], train_set._input_name)
+        self.assertListEqual(["image_t2", "mask", "class1"], train_set._output_name)
+        self.assertListEqual(["t1"], train_set._input_data)
+        self.assertListEqual(["t2", "vs", "vs_class"], train_set._output_data)
+
+        train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data="t1",
+                                   input_name="image", output_data=["t2", "cochlea"], output_name=["t2_", "cochlea_"],
+                                   batch_size=4, shuffle=False, p_augm=0.5)
+        self.assertEqual(4, train_set.batch_size)
+        self.assertEqual(0.5, train_set.p_augm)
+        self.assertEqual((256, 256), train_set.dsize)
+        self.assertEqual(False, train_set.shuffle)
+        self.assertEqual(2612, len(train_set))
+        self.assertEqual(10450, train_set._number_index)
+        self.assertListEqual(["image"], train_set._input_name)
+        self.assertListEqual(["t2_", "cochlea_"], train_set._output_name)
+        self.assertListEqual(["t1"], train_set._input_data)
+        self.assertListEqual(["t2", "cochlea"], train_set._output_data)
+
+    def test_setter(self):
+        train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data="t1",
+                                   input_name="image", output_data=["t2", "vs"], output_name=["output", "mask"],
+                                   batch_size=1, shuffle=True, p_augm=0.0)
+        # batch_size
+        train_set.batch_size = 4
+        res = train_set[0]
+        self.assertEqual(4, train_set.batch_size)
+        self.assertEqual(4, len(res[0]["image"]))
+        self.assertEqual(4, len(res[1]["output"]))
+        self.assertEqual(4, len(res[1]["mask"]))
+        self.assertEqual(4, len(res[1]["mask_2"]))
+        # dsize
+        train_set.dsize = (200, 200)
+        res = train_set[0]
+        self.assertEqual((200, 200), train_set.dsize)
+        self.assertEqual((200, 200), res[0]["image"].shape[1:])
+        self.assertEqual((200, 200), res[1]["output"].shape[1:])
+        self.assertEqual((200, 200), res[1]["mask"].shape[1:])
+        self.assertEqual((200, 200), res[1]["mask_2"].shape[1:])
+        # p augm
+        train_set.p_augm = 0.5
+        self.assertEqual(0.5, train_set.p_augm)
+        # shuffle
+        train_set.shuffle = False
+        self.assertEqual(False, train_set.shuffle)
+        # augm methods
+        train_set.augm_methods = []
+        self.assertEqual([], train_set.augm_methods)
+
+    def test_reduce_to_nonzero_segm(self):
+        train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data="t1",
+                                   input_name="image", output_data=["t2", "vs"], output_name=["t2", "mask"],
+                                   batch_size=4, shuffle=True, p_augm=0.0)
+        train_set.reduce_to_nonzero_segm("vs")
+        self.assertEqual(377, len(train_set))
+
+    def test_single_result(self):
+        train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data="t1",
+                                   input_name="image", output_data=["t2", "vs"], output_name=["output", "mask"],
+                                   batch_size=4, shuffle=True, p_augm=0.0)
+        result = train_set[1]
+        self.assertEqual(tuple, type(result))
+        self.assertEqual(2, len(result))
+        self.assertEqual(dict, type(result[0]))
+        self.assertEqual(dict, type(result[1]))
+        self.assertEqual(["image"], list(result[0].keys()))
+        self.assertEqual(["output", "mask", "mask_2"], list(result[1].keys()))
+        self.assertEqual((4, 256, 256), np.shape(result[0]["image"]))
+        self.assertEqual((4, 256, 256), np.shape(result[1]["output"]))
+        self.assertEqual((4, 256, 256), np.shape(result[1]["mask"]))
+        self.assertEqual((4, 256, 256), np.shape(result[1]["mask_2"]))
+
+    def test_single_result_with_class(self):
+        train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data="t1",
+                                   input_name="image", output_data=["t2", "vs", "vs_class"],
+                                   output_name=["output", "mask", "class1"],
+                                   batch_size=4, shuffle=False, p_augm=0.0,
+                                   alpha=-1, beta=1)
+        result = train_set[1]
+        self.assertEqual(tuple, type(result))
+        self.assertEqual(2, len(result))
+        self.assertEqual(dict, type(result[0]))
+        self.assertEqual(dict, type(result[1]))
+        self.assertEqual(["image"], list(result[0].keys()))
+        self.assertEqual(["output", "mask", "class1", "mask_2", "class1_2"], list(result[1].keys()))
+        self.assertEqual((4, 256, 256), np.shape(result[0]["image"]))
+        self.assertTrue(1 >= np.min(result[0]["image"]) >= -1)
+        self.assertTrue(1 >= np.max(result[0]["image"]) >= -1)
+        self.assertEqual((4, 256, 256), np.shape(result[1]["output"]))
+        self.assertTrue(1 >= np.min(result[1]["output"]) >= -1)
+        self.assertTrue(1 >= np.max(result[1]["output"]) >= -1)
+        self.assertEqual((4, 256, 256), np.shape(result[1]["mask"]))
+        self.assertListEqual([0], list(np.unique(result[1]["mask"])))
+        self.assertEqual((4, 256, 256), np.shape(result[1]["mask_2"]))
+        self.assertListEqual([0], list(np.unique(result[1]["mask_2"])))
+        self.assertEqual((4,), np.shape(result[1]["class1"]))
+        self.assertListEqual([0], list(np.unique(result[1]["class1"])))
+        self.assertEqual((4,), np.shape(result[1]["class1_2"]))
+        self.assertListEqual([0], list(np.unique(result[1]["class1_2"])))
+
+        train_set.reduce_to_nonzero_segm("vs")
+        result = train_set[1]
+        self.assertListEqual([0, 1], list(np.unique(result[1]["mask"])))
+        self.assertListEqual([0, 1], list(np.unique(result[1]["mask_2"])))
+        self.assertListEqual([1], list(np.unique(result[1]["class1"])))
+        self.assertListEqual([1], list(np.unique(result[1]["class1_2"])))
+
+    def test_mockup_plot_unpaired(self):
+        np.random.seed(1335)
+        train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data="t2",
+                                   input_name="image", output_data=["t1", "vs"], output_name=["output", "mask"],
+                                   batch_size=16, shuffle=True, p_augm=0.5)
+        train_set.reduce_to_nonzero_segm("vs")
+        train_set.plot_random_images(2, 2)
+
+    def test_mockup_plot_unpaired_class(self):
+        np.random.seed(1335)
+        train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data="t2",
+                                   input_name="image", output_data=["t1", "vs", "vs_class"],
+                                   output_name=["output", "mask", "class1"],
+                                   batch_size=16, shuffle=False, p_augm=0.5)
+        train_set.plot_random_images(2, 2)
+
+    def test_mockup_plot_paired(self):
+        train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data="t1",
+                                   input_name="image", output_data=["t2", "vs"], output_name=["output", "mask"],
+                                   batch_size=16, shuffle=True, p_augm=1.0)
+        train_set.reduce_to_nonzero_segm("vs")
+        train_set._unpaired = False
+        train_set.reset()
+        train_set.plot_random_images(4, 4)
+
+    def test_mockup_plot_paired_class(self):
+        train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data="t1",
+                                   input_name="image", output_data=["t2", "vs", "vs_class"],
+                                   output_name=["output", "mask", "class"],
+                                   batch_size=16, shuffle=True, p_augm=1.0)
+        train_set._unpaired = False
+        train_set.reset()
+        train_set.plot_random_images(4, 4)
