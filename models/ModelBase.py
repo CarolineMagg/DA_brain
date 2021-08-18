@@ -65,13 +65,56 @@ class ModelBase:
         else:
             return tf.keras.layers.Activation(act)
 
+    @staticmethod
+    def _get_act_layer_named(act, name):
+        """
+        Get activation function layer, eg. LeakyRelu or Relu
+        """
+        if act == 'none' or act is None:
+            return lambda: lambda x: x
+        elif act == "relu":
+            return tf.keras.layers.ReLU(name=name)
+        elif act == "leaky_relu":
+            return tf.keras.layers.LeakyReLU(alpha=0.2, name=name)
+        else:
+            return tf.keras.layers.Activation(act, name=name)
+
     def _simple_conv_block(self, x, dim, kernel_size=3, strides=1, padding="valid", use_bias=True,
-                           do_act=True, do_norm=True, kernel_init="glorot_uniform"):
+                           do_act=True, do_norm=True, kernel_init="glorot_uniform", dropout_rate=0.0):
         """
         Conv block with Conv2D + Normalization + Activation
         """
         x = tf.keras.layers.Conv2D(dim, kernel_size, strides=strides, padding=padding, use_bias=use_bias,
                                    kernel_initializer=kernel_init)(x)
+        if dropout_rate != 0.0:
+            x = tf.keras.layers.Dropout(dropout_rate)(x)
+        if do_norm:
+            x = self._normalization_layer()(x)
+        if do_act:
+            x = self._get_act_layer(self._activation)(x)
+        return x
+
+    def _simple_deconv_block(self, x, dim, kernel_size=7, strides=2, padding="same", kernel_init="glorot_uniform",
+                             do_norm=True, do_act=True):
+        x = tf.keras.layers.Conv2DTranspose(dim, kernel_size, strides=strides, padding=padding,
+                                            kernel_initializer=kernel_init)(x)
+
+        if do_norm:
+            x = self._normalization_layer()(x)
+        if do_act:
+            x = self._get_act_layer(self._activation)(x)
+        return x
+
+    def _dilated_conv_block(self, x, dim, kernel_size=3, dilation_rate=2, padding="valid", use_bias=True,
+                            do_act=True, do_norm=True, kernel_init="glorot_uniform", dropout_rate=0.0):
+        """
+        Dilated Conv block with DilatedConv2D + Normalization + Activation
+        """
+
+        x = tf.keras.layers.Conv2D(dim, kernel_size, padding=padding, use_bias=use_bias,
+                                   kernel_initializer=kernel_init, dilation_rate=dilation_rate)(x)
+        if dropout_rate != 0.0:
+            x = tf.keras.layers.Dropout(dropout_rate)(x)
         if do_norm:
             x = self._normalization_layer()(x)
         if do_act:

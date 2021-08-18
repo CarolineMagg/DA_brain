@@ -27,6 +27,7 @@ class ResnetGenerator(ModelBase):
                  padding="reflect",
                  input_name="image",
                  output_name="generated",
+                 skip=False,
                  seed=13317):
 
         super(ResnetGenerator, self).__init__(input_shape=input_shape,
@@ -42,8 +43,12 @@ class ResnetGenerator(ModelBase):
         self._n_blocks = n_blocks
         self._dim = dim
         self._padding = padding
+        self._skip = skip
 
     def _residual_block(self, x):
+        """
+        Residual block according to https://github.com/LynnHo/CycleGAN-Tensorflow-2.
+        """
         dim = x.shape[-1]
         h = x
         padding = [[0, 0], [1, 1], [1, 1], [0, 0]]
@@ -89,6 +94,10 @@ class ResnetGenerator(ModelBase):
         # last layer
         x = tf.pad(x, [[0, 0], [3, 3], [3, 3], [0, 0]], mode=self._padding)
         x = tf.keras.layers.Conv2D(self._output_classes, 7, padding="valid", use_bias=True)(x)
-        out = tf.tanh(x, name=self._output_name)
-
-        return tf.keras.Model(inputs, out, name="ResnetGenerator")
+        if self._skip is True:
+            inputs2 = tf.keras.Input(shape=self._input_shape, name="tmp")
+            out = tf.tanh(inputs + x, name=self._output_name)
+            return tf.keras.Model([inputs, inputs2], out, name="ResnetGenerator")
+        else:
+            out = tf.tanh(x, name=self._output_name)
+            return tf.keras.Model(inputs, out, name="ResnetGenerator")

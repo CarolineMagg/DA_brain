@@ -93,6 +93,9 @@ class CycleGAN:
         self.train_summary_writer = None
 
     def _set_optimizer(self, total_steps=50000, step_decay=25000):
+        """
+        Set optimizer with linear LR scheduler
+        """
         G_lr_scheduler = LinearDecay(0.0002, total_steps, step_decay)
         D_lr_scheduler = LinearDecay(0.0002, total_steps, step_decay)
         self.G_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=0.5)
@@ -103,7 +106,7 @@ class CycleGAN:
         Load data from training/validation/test folder with batch size 1, no augm and pixel value range [-1,1].
         Use only data where segmentation is available to ensure tumor presents.
         Training data - with shuffle, unpaired
-        Validation data - with shuffle, paired
+        Validation data - without shuffle, paired
         Test data - without shuffle, paired
         """
         logging.info("CycleGAN: loading data ...")
@@ -113,7 +116,7 @@ class CycleGAN:
                                            dsize=self.dsize)
         self.val_set = DataSet2DUnpaired(os.path.join(self.dir_data, "validation"), input_data=["t1"],
                                          input_name=["image"], output_data="t2", output_name="generated_t2",
-                                         batch_size=1, shuffle=True, p_augm=0.0, alpha=-1, beta=1, use_filter="vs",
+                                         batch_size=1, shuffle=False, p_augm=0.0, alpha=-1, beta=1, use_filter="vs",
                                          dsize=self.dsize)
         self.val_set._unpaired = False
         self.val_set.reset()
@@ -206,6 +209,7 @@ class CycleGAN:
 
             D_loss = S_d_loss + T_d_loss
 
+        # calc and update gradients
         D_grad = tape.gradient(D_loss, self.D_S.trainable_variables + self.D_T.trainable_variables)
         self.D_optimizer.apply_gradients(
             zip(D_grad, self.D_S.trainable_variables + self.D_T.trainable_variables))

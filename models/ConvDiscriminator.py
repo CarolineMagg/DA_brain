@@ -1,5 +1,5 @@
 ########################################################################################################################
-# ConvDiscriminator architecture
+# ConvDiscriminator architecture - PatchGen
 ########################################################################################################################
 
 import tensorflow as tf
@@ -65,5 +65,35 @@ class ConvDiscriminator(ModelBase):
 
         # last layer
         out = tf.keras.layers.Conv2D(self._output_classes, 4, strides=1, padding="same", name=self._output_name)(x)
+
+        return tf.keras.Model(inputs, out, name="ConvDiscriminator")
+
+    def generate_model_aux(self) -> tf.keras.Model:
+        """
+        Generate ConvDiscriminator keras model
+        """
+        # set seed
+        self._set_random_seed()
+        dim = self._dim
+        dim_ = self._dim
+
+        # input
+        inputs = tf.keras.layers.Input(shape=self._input_shape, name=self._input_name)
+
+        # first block
+        x = self._simple_conv_block(inputs, dim, kernel_size=4, strides=2, padding="same",
+                                    do_norm=False)
+
+        # down sampling
+        for _ in range(self._n_downsampling-1):
+            dim = min(dim*2, dim_ * 8)
+            x = self._simple_conv_block(x, dim, kernel_size=4, strides=2, padding="same", use_bias=False)
+
+        dim = min(dim*2, dim_*8)
+        x = self._simple_conv_block(x, dim, kernel_size=4, strides=1, padding="same", use_bias=False)
+
+        # last layer
+        x = tf.keras.layers.Conv2D(2, 4, strides=1, padding="same", name=self._output_name)(x)
+        out = tf.expand_dims(x[..., 0], axis=3), tf.expand_dims(x[..., 1], axis=3)
 
         return tf.keras.Model(inputs, out, name="ConvDiscriminator")
