@@ -24,10 +24,16 @@ class InferenceSimpleSegmentation:
         :param saved_model_dir: path to saved model
         :param data_gen: dataset generator
         """
+        # load model
         self._saved_model_dir = saved_model_dir
-        self.model = tf.keras.models.load_model(saved_model_dir,
-                                                custom_objects={'DiceLoss': DiceLoss,
-                                                                'DiceCoefficient': DiceCoefficient})
+        try:
+            self.model = tf.keras.models.load_model(saved_model_dir,
+                                                    custom_objects={'DiceLoss': DiceLoss,
+                                                                    'DiceCoefficient': DiceCoefficient})
+        except:
+            self.model = tf.keras.models.load_model(saved_model_dir)
+
+        # generate data
         self.data_gen = data_gen
         self.data_gen.p_augm = 0.0
         self.data_gen._alpha = 0
