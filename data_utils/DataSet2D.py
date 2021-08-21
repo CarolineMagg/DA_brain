@@ -25,8 +25,8 @@ class DataSet2D(tf.keras.utils.Sequence):
 
     def __init__(self, dataset_folder, batch_size=4,
                  input_data="t1", input_name="image",
-                 shuffle=True, p_augm=0.0, use_filter=None,
-                 dsize=(256, 256), alpha=0, beta=255):
+                 shuffle=True, p_augm=0.0, use_filter=None, filter_t1=True,
+                 dsize=(256, 256), alpha=-1, beta=1, seed=13375):
         """
         Create a new DataSet2D object.
         :param dataset_folder: path to dataset folder
@@ -38,6 +38,8 @@ class DataSet2D(tf.keras.utils.Sequence):
         :param alpha: alpha values of images (lower boundary of pixel intensity range)
         :param beta: beta values of images (upper boundary of pixel intensity range)
         """
+        # set random seed
+        np.random.seed(seed)
 
         # dataset folder
         self._path_dataset = dataset_folder
@@ -73,6 +75,8 @@ class DataSet2D(tf.keras.utils.Sequence):
                      A.MotionBlur(p=0.5, blur_limit=(3, 5))], p=0.5)
         ]
         self._filter = use_filter
+        if filter_t1:
+            self.reduce_to_nonzero_slices()
         if self._filter is not None:
             self.reduce_to_nonzero_segm(self._filter)
 
@@ -195,12 +199,26 @@ class DataSet2D(tf.keras.utils.Sequence):
         """
         data = {}
         for input_name, input_data in zip(self._input_name, self._input_data):
-            img = getattr(self._data[ds], self.lookup_data_call()[input_data])(item)
-            img = (img - np.mean(img)) / np.std(img)  # z score normalization
-            img = cv2.normalize(img, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
-            img = cv2.resize(img, dsize=self._dsize, interpolation=cv2.INTER_CUBIC)
-            data[input_name] = img
+            data[input_name] = self._load_data_sample(ds, input_data, item)
         return data
+
+    def _load_data_sample(self, ds, data_type, item):
+        sample = getattr(self._data[ds], self.lookup_data_call()[data_type])(item)
+        if data_type in ["t1", "t2"]:
+            if np.sum(sample) != 0:
+                sample = np.clip(sample, np.percentile(sample, 1), np.percentile(sample, 99))  # clip extrem values
+                sample = (sample - np.mean(sample)) / np.std(sample)  # z score normalization
+                sample = ((sample - sample.min()) / (sample.max() - sample.min())) * 2 - 1  # range [-1, 1]
+                # img = cv2.normalize(img, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
+            else:
+                logging.debug(f"DataSet2D: image data of {self._data[ds]._path_dir}, {item} is empty.")
+            return cv2.resize(sample, dsize=self._dsize, interpolation=cv2.INTER_CUBIC)
+        elif data_type in ["vs", "cochlea"]:
+            return cv2.resize(sample, dsize=self._dsize, interpolation=cv2.INTER_CUBIC)
+        elif data_type in ["vs_class", "cochlea_class"]:
+            return sample
+        else:
+            raise ValueError(f"DataSet2D: datatype {data_type} not supported.")
 
     def _augmentation(self, data):
         """
@@ -251,6 +269,20 @@ class DataSet2D(tf.keras.utils.Sequence):
         logging.info(f"DataSetGenerator: filtering {len_before} data points for {structure}...")
         for d in self._data:
             d.reduce_to_nonzero_segm(structure)
+        self._number_index = int(np.sum([len(d) for d in self._data]))
+        len_after = self._number_index
+        self.reset()
+        logging.info(
+            f"DataSetGenerator: filtering removed {len_before - len_after} data points. remaining {len_after}.")
+
+    def reduce_to_nonzero_slices(self):
+        """
+        Reduce each data container to nonzero image slices - should keep only relevant information.
+        """
+        len_before = self._number_index
+        logging.info(f"DataSetGenerator: filtering {len_before} data points for t1...")
+        for d in self._data:
+            d.reduce_to_nonzero_slices()
         self._number_index = int(np.sum([len(d) for d in self._data]))
         len_after = self._number_index
         self.reset()

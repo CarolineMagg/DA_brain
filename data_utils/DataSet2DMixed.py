@@ -145,41 +145,36 @@ class DataSet2DMixed(DataSet2D):
         # paired segm mask
         for output_name, output_data in zip(self._output_name, self._output_data):
             if output_data in ["vs", "cochlea"]:
-                output = getattr(self._data[ds[0]], self.lookup_data_call()[output_data])(item[0])
-                output = cv2.resize(output, dsize=self._dsize, interpolation=cv2.INTER_CUBIC)
-                data[output_name] = output
+                data[output_name] = self._load_data_sample(ds[0], output_data, item[0])
             if output_data in ["vs_class", "cochlea_class"]:
-                output = getattr(self._data[ds[0]], self.lookup_data_call()[output_data])(item[0])
-                data[output_name] = output
+                data[output_name] = self._load_data_sample(ds[0], output_data, item[0])
         # unpaired image and corresponding segm mask (for validation)
-        tmp = []
-        tmp_class = []
-        tmp2 = []
-        tmp2_class = []
-        for output_name, output_data in zip(self._output_name, self._output_data):
-            output = getattr(self._data[ds[1]], self.lookup_data_call()[output_data])(item[1])
-            if output_data in ["t1", "t2"]:
-                output = (output - np.mean(output)) / np.std(output)  # z score normalization
-                output = cv2.normalize(output, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
-                output = cv2.resize(output, dsize=self._dsize, interpolation=cv2.INTER_CUBIC)
-            elif output_data in ["vs", "cochlea"]:
-                output_name = output_name + "_2"
-                tmp.append(output_name)
-                tmp2.append(output_data + "_2")
-                output = cv2.resize(output, dsize=self._dsize, interpolation=cv2.INTER_CUBIC)
-            elif output_data in ["vs_class", "cochlea_class"]:
-                output_name = output_name + "_2"
-                tmp_class.append(output_name)
-                tmp2_class.append(output_data + "_2")
-            data[output_name] = output
-        if len(tmp) != 0 and tmp[0] not in self._output_name:
-            self._output_name.append(*tmp)
-            for k, v in zip(tmp2, tmp):
-                self._mapping_data_name[k] = v
-        if len(tmp_class) != 0 and tmp_class[0] not in self._output_name:
-            self._output_name.append(*tmp_class)
-            for k, v in zip(tmp2_class, tmp_class):
-                self._mapping_data_name[k] = v
+        if "t1" in self._output_data or "t2" in self._output_data:
+            tmp = []
+            tmp_class = []
+            tmp2 = []
+            tmp2_class = []
+            for output_name, output_data in zip(self._output_name, self._output_data):
+                if output_data in ["t1", "t2"]:
+                    data[output_name] = self._load_data_sample(ds[1], output_data, item[1])
+                elif output_data in ["vs", "cochlea"]:
+                    output_name = output_name + "_2"
+                    tmp.append(output_name)
+                    tmp2.append(output_data + "_2")
+                    data[output_name] = self._load_data_sample(ds[1], output_data, item[1])
+                elif output_data in ["vs_class", "cochlea_class"]:
+                    output_name = output_name + "_2"
+                    tmp_class.append(output_name)
+                    tmp2_class.append(output_data + "_2")
+                    data[output_name] = self._load_data_sample(ds[1], output_data, item[1])
+            if len(tmp) != 0 and tmp[0] not in self._output_name:
+                self._output_name.append(*tmp)
+                for k, v in zip(tmp2, tmp):
+                    self._mapping_data_name[k] = v
+            if len(tmp_class) != 0 and tmp_class[0] not in self._output_name:
+                self._output_name.append(*tmp_class)
+                for k, v in zip(tmp2_class, tmp_class):
+                    self._mapping_data_name[k] = v
         return data
 
     def _final_prep(self, data):
@@ -225,10 +220,12 @@ class DataSet2DMixed(DataSet2D):
                 output_name_segm = [v for k, v in self._mapping_data_name.items() if k in ["vs", "cochlea"]]
                 output_name_class = [v for k, v in self._mapping_data_name.items() if
                                      k in ["vs_class", "cochlea_class"]]
-                axes[row, col].imshow(data[1][output_name_segm[0]][counter], alpha=0.5)
+                if len(output_name_segm) != 0:
+                    axes[row, col].imshow(data[1][output_name_segm[0]][counter], alpha=0.5)
                 if len(output_name_class) != 0:
                     axes[row, col].set_title(
-                        "{0}, mod: {1}, class: {2}".format(counter, self._input_data[0], data[1][output_name_class[0]][counter]))
+                        "{0}, mod: {1}, class: {2}".format(counter, self._input_data[0],
+                                                           data[1][output_name_class[0]][counter]))
                 else:
                     axes[row, col].set_title(
                         "{0}, mod: {1}".format(counter, self._input_data[0]))
@@ -237,10 +234,12 @@ class DataSet2DMixed(DataSet2D):
                 output_name_segm2 = [v for k, v in self._mapping_data_name.items() if k in ["vs", "cochlea"]]
                 output_name_class2 = [v for k, v in self._mapping_data_name.items() if
                                       k in ["vs_class", "cochlea_class"]]
-                axes[row, col + 1].imshow(data[1][output_name_segm2[0]][counter], alpha=0.5)
+                if len(output_name_segm2) != 0:
+                    axes[row, col + 1].imshow(data[1][output_name_segm2[0]][counter], alpha=0.5)
                 if len(output_name_class2) != 0:
                     axes[row, col + 1].set_title(
-                        "{0}, mod: {1}, class: {2}".format(counter, self._output_data[0], data[1][output_name_class2[0]][counter]))
+                        "{0}, mod: {1}, class: {2}".format(counter, self._output_data[0],
+                                                           data[1][output_name_class2[0]][counter]))
                 else:
                     axes[row, col + 1].set_title(
                         "{0}, mod: {1}".format(counter, self._input_data[0]))

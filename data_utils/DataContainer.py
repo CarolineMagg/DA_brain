@@ -33,6 +33,7 @@ class DataContainer:
         self._path_cochlea = None
         if len([f for f in files if "vs_gk_struc2" in f]) != 0:
             self._path_cochlea = os.path.join(dir_path, [f for f in files if "vs_gk_struc2" in f][0])
+        self._path_data_info = os.path.join(dir_path, "vs_gk_t1_info.txt")
         self._data_t1 = None
         self._data_t2 = None
         self._data_vs = None
@@ -125,6 +126,16 @@ class DataContainer:
 
         return non_zero_vs, non_zero_cochlea
 
+    def _get_non_zero_slices_t1(self):
+        """
+        Extract first non-empty T1 slices index.
+        """
+        if os.path.isfile(self._path_data_info):
+            with open(self._path_data_info, "r") as f:
+                return int(f.read())
+        else:
+            return None
+
     @staticmethod
     def _get_non_zero_slices_segmentation(segmentation):
         return [idx for idx in range(0, segmentation.shape[2]) if np.sum(segmentation[:, :, idx]) != 0]
@@ -161,6 +172,17 @@ class DataContainer:
             self._data_vs = self._data_vs.slicer[..., idx_slice[0]:idx_slice[-1]]
             self._data_cochlea = self._data_cochlea.slicer[...,
                                  idx_slice[0]:idx_slice[-1]] if self._data_cochlea is not None else None
+
+    def reduce_to_nonzero_slices(self):
+        """
+        Reduce the data to nonzero segmentation slices - should keep only relevant information
+        """
+        idx_slice = self._get_non_zero_slices_t1()
+        if idx_slice is not None:
+            self._data_t1 = self._data_t1.slicer[..., idx_slice:]
+            self._data_t2 = self._data_t2.slicer[..., idx_slice:]
+            self._data_vs = self._data_vs.slicer[..., idx_slice:]
+            self._data_cochlea = self._data_cochlea.slicer[..., idx_slice:] if self._data_cochlea is not None else None
 
     def plot_slice(self, slice_to_vis=None, figsize=(15, 15), cmap="gray"):
         """

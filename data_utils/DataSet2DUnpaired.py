@@ -120,11 +120,7 @@ class DataSet2DUnpaired(DataSet2D):
         """
         data = super(DataSet2DUnpaired, self)._load_data_item(ds[0], item[0])
         for output_name, output_data in zip(self._output_name, self._output_data):
-            output = getattr(self._data[ds[1]], self.lookup_data_call()[output_data])(item[1])
-            output = (output - np.mean(output)) / np.std(output)  # z score normalization
-            output = cv2.normalize(output, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
-            output = cv2.resize(output, dsize=self._dsize, interpolation=cv2.INTER_CUBIC)
-            data[output_name] = output
+            data[output_name] = self._load_data_sample(ds[1], output_data, item[1])
         return data
 
     def reset(self):

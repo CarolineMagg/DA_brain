@@ -126,12 +126,7 @@ class DataSet2DPaired(DataSet2D):
         data = super(DataSet2DPaired, self)._load_data_item(ds, item)
         if self._output_name is not None and self._output_data is not None:
             for output_name, output_data in zip(self._output_name, self._output_data):
-                segm = getattr(self._data[ds], self.lookup_data_call()[output_data])(item)
-                if output_data in ["t1", "t2"]:
-                    segm = (segm - np.mean(segm)) / np.std(segm)  # z score normalization
-                    segm = cv2.normalize(segm, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
-                segm = cv2.resize(segm, dsize=self._dsize, interpolation=cv2.INTER_CUBIC)
-                data[output_name] = segm
+                data[output_name] = self._load_data_sample(ds, output_data, item)
         return data
 
     def plot_random_images(self, nrows=2, ncols=2):
