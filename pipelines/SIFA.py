@@ -18,7 +18,7 @@ from models.ConvDiscriminator import ConvDiscriminator
 from models.SIFADecoder import SIFADecoder
 from models.SIFAEncoder import SIFAEncoder
 from models.SIFASegmentation import SIFASegmentation
-from pipeline.Checkpoint import Checkpoint
+from pipelines.Checkpoint import Checkpoint
 
 __author__ = "c.magg"
 

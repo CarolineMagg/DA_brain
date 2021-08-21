@@ -16,17 +16,15 @@ from losses.dice import DiceLoss, DiceCoefficient
 __author__ = "c.magg"
 
 from models.UNet_ClassGuided import UNet_ClassGuided
-from pipeline.Checkpoint import Checkpoint
+from pipelines.Checkpoint import Checkpoint
 
 
 class ClassGuidedSegmentation:
 
     def __init__(self, data_dir, tensorboard_dir, checkpoints_dir, save_model_dir, sample_dir,
-                 seed=13375, sample_step=1000, dsize=(256, 256)):
+                 seed=13375, sample_step=1000, dsize=(256, 256), batch_size=4, activation="relu"):
         """
-        ClassGuidedSegmentation pipeline
-        :param tensorboard_dir: directory for tensorboard logging
-        :param save_model_dir: file path for saved models
+        ClassGuidedSegmentation pipeline, ie UNet with classification-guided module
         """
         # random seed
         tf.random.set_seed(seed)
@@ -44,6 +42,7 @@ class ClassGuidedSegmentation:
 
         # parameters
         self.dsize = dsize
+        self.batch_size = batch_size
         self.sample_step = sample_step
         self.template = "{4}/{5} in {6:.4f} sec - Dice_loss: {0:.5f} - BCE_loss: {1:.5f} - Segm_loss: {2:.5f} - Dice_coeff: {3:.5f}"
 
@@ -54,8 +53,9 @@ class ClassGuidedSegmentation:
         self._load_data()
 
         # model
-        self.model = UNet_ClassGuided(input_shape=(*dsize, 1), input_name="image",
-                                      output_name=["vs", "vs_class"]).generate_model()
+        self.model = UNet_ClassGuided(input_shape=(*dsize, 1), input_name="image", output_name=["vs", "vs_class"],
+                                      filter_depth=(32, 64, 128, 256), activation=activation,
+                                      seed=seed).generate_model()
         self.optimizer = tf.keras.optimizers.Adam(lr=0.001)
         self.losses = DiceLoss()
         self.bce_loss = tf.keras.losses.BinaryCrossentropy()
@@ -63,37 +63,24 @@ class ClassGuidedSegmentation:
 
     def _load_data(self):
         """
-        Load data from training/validation/test folder with batch size 1, no augm and pixel value range [-1,1].
-        Use only data where segmentation is available to ensure tumor presents.
-        Training data - with shuffle, unpaired
-        Validation data - with shuffle, paired
-        Test data - without shuffle, paired
+        Load data from training/validation folder with batch size, no augm and pixel value range [-1,1].
+        Entire training data is used
+        Training data - with shuffle, paired
+        Validation data - without shuffle, paired
         """
         logging.info("ClassGuidedSegmentation: loading data ...")
         self.train_set = DataSet2DMixed(os.path.join(self.dir_data, "training"), input_data=["t1"],
                                         input_name=["image"], output_data=["vs", "vs_class"],
                                         output_name=["vs", "vs_class"],
-                                        batch_size=1, shuffle=True, p_augm=0.0, alpha=0, beta=255,
+                                        batch_size=self.batch_size, shuffle=True, p_augm=0.0, alpha=-1, beta=1,
                                         dsize=self.dsize)
         self.val_set = DataSet2DMixed(os.path.join(self.dir_data, "validation"), input_data=["t1"],
                                       input_name=["image"], output_data=["vs", "vs_class"],
                                       output_name=["vs", "vs_class"],
-                                      batch_size=1, shuffle=False, p_augm=0.0, alpha=0, beta=255,
+                                      batch_size=self.batch_size, shuffle=False, p_augm=0.0, alpha=-1, beta=1,
                                       dsize=self.dsize)
-        self.val_set._unpaired = False
-        self.val_set.reset()
         logging.info(
             "ClassGuidedSegmentation: training {0}, validation {1}".format(len(self.train_set), len(self.val_set)))
-
-        self.test_set = DataSet2DMixed(os.path.join(self.dir_data, "test"), input_data=["t1"],
-                                       input_name=["image"], output_data=["vs", "vs_class"],
-                                       output_name=["vs", "vs_class"],
-                                       batch_size=1, shuffle=False, p_augm=0.0, alpha=0, beta=255,
-                                       dsize=self.dsize)
-        self.test_set._unpaired = False
-        self.test_set.reset()
-
-        logging.info("ClassGuidedSegmentation: test {0}".format(len(self.test_set)))
 
     @tf.function
     def train_step(self, X, Y_seg, Y_class):
@@ -169,7 +156,7 @@ class ClassGuidedSegmentation:
         y_pred = self.model(X, training=False)
         return y_pred[:-1], y_pred[-1]
 
-    def train(self, epochs=50, data_nr=None, restore=True, step_decay=None):
+    def train(self, epochs=50, data_nr=None, restore=True, augm_step=False, p_augm=0.5):
         """
         Train ClassGuidedSegmentation pipeline:
         1) initialize local variables
@@ -184,6 +171,7 @@ class ClassGuidedSegmentation:
             write tensorboard summary
             save checkpoint
         5) save model
+        Note: currently no augmentation support
         """
         logging.info("ClassGuidedSegmentation: set up training.")
 
@@ -199,11 +187,13 @@ class ClassGuidedSegmentation:
             total_time_per_epoch = 0
             print("Epoch {0}/{1}".format(epoch, epochs))
             for idx in range(data_nr):
+                # load data
                 X, Y = self.train_set[idx]
                 X = X["image"]
                 Y_segm = Y["vs"]
                 Y_class = Y["vs_class"]
                 start = time()
+                # train step
                 loss_dict = self.train_step(X, Y_segm, Y_class)
                 elapsed = time() - start
                 total_time_per_epoch += elapsed
@@ -215,15 +205,17 @@ class ClassGuidedSegmentation:
                                            total_time_per_epoch),
                       end="\r")
                 self.train_set.reset()
+                # collect losses
                 loss_dict_list = self._collect_losses(loss_dict, loss_dict_list)
+                # sample
                 if idx % self.sample_step == 0:
                     A, B = self.val_set[sample_counter]
                     A = A["image"]
                     B_segm = B["vs"]
-                    B_class = B["vs_class"]
                     B_pred, _ = self.sample(A)
                     img = np.hstack(
-                        np.concatenate([tf.expand_dims(A, -1), B_pred[0]*100, tf.expand_dims(B_segm, -1)*100], axis=0))
+                        np.concatenate([tf.expand_dims(A, -1), B_pred[0] * 100, tf.expand_dims(B_segm, -1) * 100],
+                                       axis=0))
                     img = cv2.normalize(img, img, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
                     cv2.imwrite(os.path.join(self.dir_sample, 'iter-%03d-%05d.jpg' % (epoch, idx)),
                                 img)
@@ -231,6 +223,7 @@ class ClassGuidedSegmentation:
                     if sample_counter >= len(self.val_set):
                         sample_counter = 0
 
+            # tensorboard summary
             with self.train_summary_writer.as_default():
                 for k, v in loss_dict_list.items():
                     tf.summary.scalar(k, np.mean(v), step=epoch)
@@ -242,6 +235,7 @@ class ClassGuidedSegmentation:
                                        np.mean(loss_dict_list["segm_loss"]),
                                        np.mean(loss_dict_list["dice_coeff"]),
                                        data_nr - 1, data_nr - 1, total_time_per_epoch))
+            # save checkpoint
             self.checkpoint.save(epoch)
-
+        # save final model
         self._save_models()

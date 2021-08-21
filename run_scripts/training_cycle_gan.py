@@ -5,10 +5,10 @@ import argparse
 parent = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, parent)
 
-from pipeline.CycleGAN import CycleGAN
+from pipelines.CycleGAN import CycleGAN
 from models.utils import check_gpu
 
-parser = argparse.ArgumentParser(description='Process supervised segm pipeline parameters.')
+parser = argparse.ArgumentParser(description='Process cycle gan pipeline parameters.')
 parser.add_argument('--seed', dest='seed', default=1334, type=int,
                     help='set seed for pipeline init')
 parser.add_argument('--sample_step', dest='sample_step', default=500, type=int,
@@ -33,7 +33,7 @@ args = parser.parse_args()
 if __name__ == "__main__":
     check_gpu()
 
-    print(f"Training with CycleGAN.")
+    print("Training with CycleGAN.")
     seed = args.seed
     d_step = args.d_step
     dsize = args.dsize
@@ -44,10 +44,11 @@ if __name__ == "__main__":
     data_nr = args.data_nr if args.data_nr != 0 else None
     step_decay = args.step_decay if args.step_decay != 0 else None
 
-    tensorboard_dir = "/tf/workdir/DA_brain/logs/gan_{}/".format(seed)
-    checkpoints_dir = "/tf/workdir/DA_brain/saved_models/gan_{}/checkpoints/".format(seed)
-    save_model_dir = "/tf/workdir/DA_brain/saved_models/gan_{}".format(seed)
-    sample_dir = "/tf/workdir/DA_brain/saved_models/gan_{}/sample_dir/".format(seed)
+    identifier = f"gan_{seed}"
+    tensorboard_dir = f"/tf/workdir/DA_brain/logs/{identifier}/"
+    checkpoints_dir = f"/tf/workdir/DA_brain/saved_models/{identifier}/checkpoints/"
+    save_model_dir = f"/tf/workdir/DA_brain/saved_models/{identifier}/"
+    sample_dir = f"/tf/workdir/DA_brain/saved_models/{identifier}/sample_dir/"
     data_dir = "/tf/workdir/data/VS_segm/VS_registered/"
     cyclegan = CycleGAN(data_dir=data_dir,
                         tensorboard_dir=tensorboard_dir,
