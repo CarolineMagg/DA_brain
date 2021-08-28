@@ -127,3 +127,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# custom folders
+saved_models/
+logs/
+tmp/
+tmp_data_tests/
