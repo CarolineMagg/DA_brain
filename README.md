@@ -46,6 +46,10 @@ The split training/test split was 80:20 and the training data is split again int
 | validation | 38        | 158 - 197 (160,168)      |
 | test       | 50        | 198 - 250 (208,219,227)  |
 
+### Data Preprocessing
+
+The data preprocessing performed in `DataSet2D` and `DataSet2DMixed` are based on data statistics and informations.
+After the data has the structure discribed above, the script `GenerateStatistics.py` generates a json file in each patient folder with the infromation necessary for preprocessing.
 
 ## Docker & Requirements
 You can use [Docker](https://www.docker.com/) to setup your environment. For installation guide see [Install Docker](https://docs.docker.com/get-docker/). <br> 
