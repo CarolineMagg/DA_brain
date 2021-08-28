@@ -25,18 +25,10 @@ class DataSet2D(tf.keras.utils.Sequence):
 
     def __init__(self, dataset_folder, batch_size=4,
                  input_data="t1", input_name="image",
-                 shuffle=True, p_augm=0.0, use_filter=None, filter_t1=True,
-                 dsize=(256, 256), alpha=-1, beta=1, seed=13375):
+                 shuffle=True, p_augm=0.0, use_filter=None, use_balance=False,
+                 dsize=(256, 256), alpha=0, beta=1, seed=13375):
         """
         Create a new DataSet2D object.
-        :param dataset_folder: path to dataset folder
-        :param batch_size: batch size for loading data
-        :param input_data: input data identifiers, eg. t1, t2
-        :param shuffle: boolean for shuffle the indices
-        :param use_filter: use structure for filtering
-        :param dsize: image size
-        :param alpha: alpha values of images (lower boundary of pixel intensity range)
-        :param beta: beta values of images (upper boundary of pixel intensity range)
         """
         # set random seed
         np.random.seed(seed)
@@ -50,7 +42,8 @@ class DataSet2D(tf.keras.utils.Sequence):
         self._load_data()
 
         # set indices
-        self._number_index = int(np.sum([len(d) for d in self._data]))
+        self.list_index = []
+        self._number_index = int(np.sum([len(d) for d in self._data])) if len(self.list_index) == 0 else len(self.list_index)
         self.index_pairwise = []
         self._shuffle = shuffle
         random.seed(13371984)
@@ -75,10 +68,11 @@ class DataSet2D(tf.keras.utils.Sequence):
                      A.MotionBlur(p=0.5, blur_limit=(3, 5))], p=0.5)
         ]
         self._filter = use_filter
-        if filter_t1:
-            self.reduce_to_nonzero_slices()
         if self._filter is not None:
             self.reduce_to_nonzero_segm(self._filter)
+        self._balance = use_balance
+        if self._balance:
+            self.balance_dataset()
 
     @staticmethod
     def lookup_data_call():
@@ -129,6 +123,24 @@ class DataSet2D(tf.keras.utils.Sequence):
     def dsize(self, to):
         logging.info(f"DataSet2D: set 'dsize' to {to}")
         self._dsize = to
+
+    @property
+    def alpha(self):
+        return self._alpha
+
+    @alpha.setter
+    def alpha(self, to):
+        logging.info(f"DataSet2D: set 'alpha' to {to}")
+        self._alpha = to
+
+    @property
+    def beta(self):
+        return self._beta
+
+    @beta.setter
+    def beta(self, to):
+        logging.info(f"DataSet2D: set 'beta' to {to}")
+        self._beta = to
 
     @property
     def p_augm(self):
@@ -204,16 +216,7 @@ class DataSet2D(tf.keras.utils.Sequence):
 
     def _load_data_sample(self, ds, data_type, item):
         sample = getattr(self._data[ds], self.lookup_data_call()[data_type])(item)
-        if data_type in ["t1", "t2"]:
-            if np.sum(sample) != 0:
-                sample = np.clip(sample, np.percentile(sample, 1), np.percentile(sample, 99))  # clip extrem values
-                sample = (sample - np.mean(sample)) / np.std(sample)  # z score normalization
-                sample = ((sample - sample.min()) / (sample.max() - sample.min())) * 2 - 1  # range [-1, 1]
-                # img = cv2.normalize(img, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
-            else:
-                logging.debug(f"DataSet2D: image data of {self._data[ds]._path_dir}, {item} is empty.")
-            return cv2.resize(sample, dsize=self._dsize, interpolation=cv2.INTER_CUBIC)
-        elif data_type in ["vs", "cochlea"]:
+        if data_type in ["t1", "t2", "vs", "cochlea"]:
             return cv2.resize(sample, dsize=self._dsize, interpolation=cv2.INTER_CUBIC)
         elif data_type in ["vs_class", "cochlea_class"]:
             return sample
@@ -241,13 +244,16 @@ class DataSet2D(tf.keras.utils.Sequence):
         """
         image_keys = [k for k, v in self.lookup_data_augmentation().items() if v == 'image']
         for k in image_keys:
-            data[k] = cv2.normalize(data[k], None, alpha=self._alpha, beta=self._beta, norm_type=cv2.NORM_MINMAX)
+            data[k] = ((data[k] - np.min(data[k])) / (np.max(data[k]) - np.min(data[k]))) * (
+                    self.beta - self.alpha) + self.alpha
+            # cv2.normalize(data[k], None, alpha=self._alpha, beta=self._beta, norm_type=cv2.NORM_MINMAX)
         return data
 
     def _load_data(self):
         """
         Load data from folders with DataContainer.
         """
+        logging.info("DataSet2D: Load data ...")
         for f in self._folders:
             folder = os.path.join(self._path_dataset, f)
             self._data.append(DataContainer(folder))
@@ -256,7 +262,7 @@ class DataSet2D(tf.keras.utils.Sequence):
         """
         Reset indices and shuffle randomly if necessary.
         """
-        self.index_pairwise = [(idx, n) for idx, d in enumerate(self._data) for n in range(len(d))]
+        self.index_pairwise = [(idx, n) for idx, d in enumerate(self._data) for n in range(len(d))] if len(self.list_index) == 0 else self.list_index
         if self._shuffle:
             self.index_pairwise = np.random.permutation(self.index_pairwise)
 
@@ -266,28 +272,33 @@ class DataSet2D(tf.keras.utils.Sequence):
         :param structure: identifier for structure to use for filtering - default: both structures are kept
         """
         len_before = self._number_index
-        logging.info(f"DataSetGenerator: filtering {len_before} data points for {structure}...")
+        logging.info(f"DataSet2D: filtering {len_before} data points for {structure}...")
         for d in self._data:
             d.reduce_to_nonzero_segm(structure)
         self._number_index = int(np.sum([len(d) for d in self._data]))
         len_after = self._number_index
         self.reset()
         logging.info(
-            f"DataSetGenerator: filtering removed {len_before - len_after} data points. remaining {len_after}.")
+            f"DataSet2D: filtering removed {len_before - len_after} data points. remaining {len_after}.")
 
-    def reduce_to_nonzero_slices(self):
+    def balance_dataset(self):
         """
-        Reduce each data container to nonzero image slices - should keep only relevant information.
+        Balance each data container to have equal number of slices with/without the structure.
+        :param structure: identifier for structure to use for balancing - default: vs segmentation
         """
+        self.list_index = []
         len_before = self._number_index
-        logging.info(f"DataSetGenerator: filtering {len_before} data points for t1...")
-        for d in self._data:
-            d.reduce_to_nonzero_slices()
-        self._number_index = int(np.sum([len(d) for d in self._data]))
+        logging.info(f"DataSet2D: balancing {len_before} data points for vs_class...")
+        for idx, d in enumerate(self._data):
+            idx_vs_nonzero, _ = d.get_non_zero_slices_segmentation()
+            idx_vs_zero = d.get_zero_slices_segmentation()
+            blub = random.sample(idx_vs_zero, k=len(idx_vs_nonzero))
+            self.list_index += [(idx, ix) for ix in sorted(blub + idx_vs_nonzero)]
+        self._number_index = int(np.sum([len(d) for d in self._data])) if len(self.list_index) == 0 else len(self.list_index)
         len_after = self._number_index
         self.reset()
         logging.info(
-            f"DataSetGenerator: filtering removed {len_before - len_after} data points. remaining {len_after}.")
+            f"DataSet2D: balancing removed {len_before - len_after} data points. remaining {len_after}.")
 
     def plot_random_images(self, nrows=2, ncols=2):
         """

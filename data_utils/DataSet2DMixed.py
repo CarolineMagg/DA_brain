@@ -18,35 +18,23 @@ class DataSet2DMixed(DataSet2D):
     It contains inputs (image) and outputs (images, segmentation) in an unpaired/paired manner:
      * not same patient and slice for image to image (unpaired)
      * same patient and slice for image to segm (paired)
-    Only one input is supported!
-    Segm mask will always have pixel values [0,1], whereas images will have [alpha, beta].
+    Segm mask will always have pixel values [0,1], whereas images will have [alpha, beta] (default: [0,1]).
     """
 
     def __init__(self, dataset_folder, batch_size=4,
                  input_data="t1", input_name="image",
                  output_data=["t2", "vs", "vs_class"], output_name=["image_output", "vs_output"],
-                 shuffle=True, p_augm=0.0, use_filter=None,
-                 dsize=(256, 256), alpha=0, beta=255):
+                 shuffle=True, p_augm=0.0, use_filter=None, use_balance=False,
+                 dsize=(256, 256), alpha=0, beta=1, seed=13375):
         """
         Create a new DataSet2D object.
-        :param dataset_folder: path to dataset folder
-        :param batch_size: batch size for loading data
-        :param input_data: input data identifiers, eg. t1
-        :param output_data: output data identifiers, eg t2
-        :param input_name: name of the input tensors, eg. image (Note: at least one image input is mandatory)
-        :param output_name: name of the output tensors, eg. image_output
-        :param shuffle: boolean for shuffle the indices
-        :param use_filter: use structure for filtering
-        :param dsize: image size
-        :param alpha: alpha values of images (lower boundary of pixel intensity range)
-        :param beta: beta values of images (upper boundary of pixel intensity range)
 
         Examples:
         # Dataset for adversarial learning with input t1 and output t2
-        >> dataset = DataSet2DUnpaired(dataset_folder="../data/VS_segm/VS_registered/training/",
-                                        input_data="t1", input_name="image",
-                                        output_data="t2", output_data="image_output",
-                                        batch_size = 4, shuffle=True, p_augm=0.0)
+        >> dataset = DataSet2DMixed(dataset_folder="../data/VS_segm/VS_registered/training/",
+                                    input_data="t1", input_name="image",
+                                    output_data="t2", output_data="image_output",
+                                    batch_size = 4, shuffle=True, p_augm=0.0)
         """
 
         self.index_pairwise_output = []
@@ -54,7 +42,7 @@ class DataSet2DMixed(DataSet2D):
         super(DataSet2DMixed, self).__init__(dataset_folder, batch_size=batch_size,
                                              input_data=input_data, input_name=input_name,
                                              shuffle=shuffle, p_augm=p_augm, use_filter=use_filter,
-                                             dsize=dsize, alpha=alpha, beta=beta)
+                                             use_balance=use_balance, dsize=dsize, alpha=alpha, beta=beta, seed=seed)
 
         # output data
         self._output_name = output_name if type(output_name) == list else [output_name]
@@ -63,7 +51,7 @@ class DataSet2DMixed(DataSet2D):
         assert len(self._output_data) == len(self._output_name)
 
         # only one input allowed!
-        assert len(self._input_name) == 1
+        # assert len(self._input_name) == 1
 
         self._augm_methods = [
             A.ShiftScaleRotate(p=0.5, rotate_limit=15, border_mode=cv2.BORDER_CONSTANT),
@@ -81,9 +69,9 @@ class DataSet2DMixed(DataSet2D):
         return {'t1': 't1_scan_slice',
                 't2': 't2_scan_slice',
                 'vs': 'segm_vs_slice',
-                'vs_class': 'segm_vs_class',
+                'vs_class': 'segm_vs_class_slice',
                 'cochlea': 'segm_cochlea_slice',
-                'cochlea_class': 'segm_cochlea_class'}
+                'cochlea_class': 'segm_cochlea_class_slice'}
 
     def lookup_data_augmentation(self):
         """
@@ -177,22 +165,12 @@ class DataSet2DMixed(DataSet2D):
                     self._mapping_data_name[k] = v
         return data
 
-    def _final_prep(self, data):
-        """
-        Apply final processing methods, eg. normalize for images
-        :param data: data dictionary
-        :return: transformed data dictionary
-        """
-        image_keys = [k for k, v in self.lookup_data_augmentation().items() if v == 'image']
-        for key in image_keys:
-            data[key] = cv2.normalize(data[key], None, alpha=self._alpha, beta=self._beta, norm_type=cv2.NORM_MINMAX)
-        return data
-
     def reset(self):
         """
         Reset indices and shuffle randomly if necessary.
         """
-        self.index_pairwise = [(idx, n) for idx, d in enumerate(self._data) for n in range(len(d))]
+        self.index_pairwise = [(idx, n) for idx, d in enumerate(self._data) for n in range(len(d))] if len(
+            self.list_index) == 0 else self.list_index
         self.index_pairwise_output = self.index_pairwise
         if self._unpaired:
             self.index_pairwise_output = np.random.permutation(self.index_pairwise_output)
@@ -230,7 +208,8 @@ class DataSet2DMixed(DataSet2D):
                     axes[row, col].set_title(
                         "{0}, mod: {1}".format(counter, self._input_data[0]))
 
-                axes[row, col + 1].imshow(data[1][self._output_name[0]][counter], cmap="gray")
+                if len(output_name_segm) != 0:
+                    axes[row, col + 1].imshow(data[1][self._output_name[0]][counter], cmap="gray")
                 output_name_segm2 = [v for k, v in self._mapping_data_name.items() if k in ["vs", "cochlea"]]
                 output_name_class2 = [v for k, v in self._mapping_data_name.items() if
                                       k in ["vs_class", "cochlea_class"]]

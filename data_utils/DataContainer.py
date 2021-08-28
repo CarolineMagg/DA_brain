@@ -1,7 +1,9 @@
 ########################################################################################################################
 # DataContainer to load nifti files in patient data folder
 ########################################################################################################################
+import json
 import logging
+import random
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -33,11 +35,12 @@ class DataContainer:
         self._path_cochlea = None
         if len([f for f in files if "vs_gk_struc2" in f]) != 0:
             self._path_cochlea = os.path.join(dir_path, [f for f in files if "vs_gk_struc2" in f][0])
-        self._path_data_info = os.path.join(dir_path, "vs_gk_t1_info.txt")
+        self._path_data_info = os.path.join(dir_path, "vs_gk_statistics.json")
         self._data_t1 = None
         self._data_t2 = None
         self._data_vs = None
         self._data_cochlea = None
+        self._statistics = None
         self.load()
 
     def __len__(self):
@@ -65,6 +68,15 @@ class DataContainer:
         self._data_t2 = nib.load(self._path_t2)
         self._data_vs = nib.load(self._path_vs)
         self._data_cochlea = nib.load(self._path_cochlea) if self._path_cochlea is not None else None
+        with open(self._path_data_info) as json_file:
+            self._statistics = json.load(json_file)
+        # only use non-empty slices
+        idx_slice = int(self._statistics["t1"]["first_nonempty_slice"])
+        if idx_slice is not 0:
+            self._data_t1 = self._data_t1.slicer[..., idx_slice:]
+            self._data_t2 = self._data_t2.slicer[..., idx_slice:]
+            self._data_vs = self._data_vs.slicer[..., idx_slice:]
+            self._data_cochlea = self._data_cochlea.slicer[..., idx_slice:] if self._data_cochlea is not None else None
 
     def uncache(self):
         """
@@ -73,15 +85,15 @@ class DataContainer:
         self._data_t1.uncache()
         self._data_t2.uncache()
         self._data_vs.uncache()
-        self._data_cochlea.uncache()
+        self._data_cochlea.uncache() if self._data_cochlea is not None else None
 
     @property
     def t1_scan(self):
-        return np.asarray(self._data_t1.dataobj, dtype=np.float32)
+        return self._load_item(np.asarray(self._data_t1.dataobj, dtype=np.float32), "t1")
 
     @property
     def t2_scan(self):
-        return np.asarray(self._data_t2.dataobj, dtype=np.float32)
+        return self._load_item(np.asarray(self._data_t2.dataobj, dtype=np.float32), "t2")
 
     @property
     def segm_vs(self):
@@ -93,25 +105,43 @@ class DataContainer:
                           dtype=np.int16) if self._data_cochlea is not None else np.zeros_like(
             self._data_t1.dataobj, dtype=np.int16)
 
+    @property
+    def segm_vs_class(self):
+        return [1 if np.sum(self.segm_vs[:, :, idx]) != 0 else 0 for idx in range(0, self.segm_vs.shape[2])]
+
+    @property
+    def segm_cochlea_class(self):
+        return [1 if np.sum(self.segm_cochlea[:, :, idx]) != 0 else 0 for idx in range(0, self.segm_cochlea.shape[2])]
+
     def t1_scan_slice(self, index=None):
-        return np.asarray(self._data_t1.dataobj[..., index], dtype=np.float32)
+        return self._load_item(np.asarray(self._data_t1.dataobj[..., index], dtype=np.float32), "t1")
 
     def t2_scan_slice(self, index=None):
-        return np.asarray(self._data_t2.dataobj[..., index], dtype=np.float32)
+        return self._load_item(np.asarray(self._data_t2.dataobj[..., index], dtype=np.float32), "t2")
 
     def segm_vs_slice(self, index=None):
         return np.asarray(self._data_vs.dataobj[..., index], dtype=np.int16)
-
-    def segm_vs_class(self, index=None):
-        return 0 if np.sum(self.segm_vs_slice(index)) == 0 else 1
 
     def segm_cochlea_slice(self, index=None):
         return np.asarray(self._data_cochlea.dataobj[..., index],
                           dtype=np.int16) if self._data_cochlea is not None else np.zeros_like(
             self._data_t1.dataobj[..., index])
 
-    def segm_cochlea_class(self, index=None):
-        return 0 if np.sum(self.segm_cochlea_class(index)) == 0 else 1
+    def segm_vs_class_slice(self, index=None):
+        return self.segm_vs_class[index]
+
+    def segm_cochlea_class_slice(self, index=None):
+        return self.segm_cochlea_class[index]
+
+    def _load_item(self, array, data_type):
+        # clip extrem values
+        sample = np.clip(array, float(self._statistics[data_type]["1st_percentile"]),
+                         float(self._statistics[data_type]["99th_percentile"]))
+        # z score normalization
+        sample = (sample - float(self._statistics[data_type]["mean"])) / float(self._statistics[data_type]["std"])
+        # range [0, 1]
+        return (sample - float(self._statistics[data_type]["min"])) / (
+                float(self._statistics[data_type]["max"]) - float(self._statistics[data_type]["min"]))
 
     def get_non_zero_slices_segmentation(self):
         """
@@ -120,36 +150,53 @@ class DataContainer:
         """
         img_vs = self.segm_vs
         img_cochlea = self.segm_cochlea
-
         non_zero_vs = self._get_non_zero_slices_segmentation(img_vs)
         non_zero_cochlea = self._get_non_zero_slices_segmentation(img_cochlea) if img_cochlea is not None else []
-
         return non_zero_vs, non_zero_cochlea
 
-    def _get_non_zero_slices_t1(self):
+    def get_zero_slices_segmentation(self):
         """
-        Extract first non-empty T1 slices index.
+        Extract all slices of segmentation that are non-zero.
+        :return: list with non-zero slice indices for VS and cochlea
         """
-        if os.path.isfile(self._path_data_info):
-            with open(self._path_data_info, "r") as f:
-                return int(f.read())
-        else:
-            return None
+        img_vs = self.segm_vs
+        non_zero_vs = self._get_zero_slices_segmentation(img_vs)
+        return non_zero_vs
 
     @staticmethod
     def _get_non_zero_slices_segmentation(segmentation):
         return [idx for idx in range(0, segmentation.shape[2]) if np.sum(segmentation[:, :, idx]) != 0]
 
-    def get_slice_to_vis(self):
-        """
-        Get median slice where VS (and cochlea) segmentations exist.
-        :return:
-        """
-        slice_vs, slice_cochlea = self.get_non_zero_slices_segmentation()
-        if len(slice_cochlea) != 0:
-            return int(np.median(list(set(slice_vs).intersection(slice_cochlea))))
-        else:
-            return int(np.median(slice_vs))
+    @staticmethod
+    def _get_zero_slices_segmentation(segmentation):
+        return [idx for idx in range(0, segmentation.shape[2]) if np.sum(segmentation[:, :, idx]) == 0]
+
+    # def get_non_zero_slices_segmentation(self):
+    #     """
+    #     Extract all slices of segmentation that are non-zero.
+    #     :return: list with non-zero slice indices for VS and cochlea
+    #     """
+    #     non_zero_vs = [idx for idx in range(0, self.segm_vs.shape[2]) if np.sum(self.segm_vs[:, :, idx]) != 0]
+    #     non_zero_cochlea = [idx for idx in range(0, self.segm_cochlea.shape[2]) if np.sum(self.segm_cochlea[:, :, idx]) != 0]
+    #     return non_zero_vs, non_zero_cochlea
+    #
+    # def get_zero_slices_segmentation(self):
+    #     """
+    #     Extract all slices of segmentation that are zero.
+    #     :return: list with non-zero slice indices for VS and cochlea
+    #     """
+    #     zero_vs = [idx for idx, v in enumerate(self.segm_vs_class) if v == 0]
+    #     zero_cochlea = [idx for idx, v in enumerate(self.segm_cochlea_class) if v == 0]
+    #     return zero_vs, zero_cochlea
+    #
+    # def get_slices_info_vs(self):
+    #     """
+    #     Extract all slices indices of segmentation vs that are non-zero and zero.
+    #     :return: list with non-zero and zero slice indices for VS
+    #     """
+    #     non_zero_vs = [idx for idx in range(0, self.segm_vs.shape[2]) if np.sum(self.segm_vs[:, :, idx]) != 0]
+    #     zero_vs = [idx for idx, v in enumerate(self.segm_vs_class) if v == 0]
+    #     return non_zero_vs, zero_vs
 
     def reduce_to_nonzero_segm(self, structure=None):
         """
@@ -173,16 +220,16 @@ class DataContainer:
             self._data_cochlea = self._data_cochlea.slicer[...,
                                  idx_slice[0]:idx_slice[-1]] if self._data_cochlea is not None else None
 
-    def reduce_to_nonzero_slices(self):
+    def get_slice_to_vis(self):
         """
-        Reduce the data to nonzero segmentation slices - should keep only relevant information
+        Get median slice where VS (and cochlea) segmentations exist.
+        :return:
         """
-        idx_slice = self._get_non_zero_slices_t1()
-        if idx_slice is not None:
-            self._data_t1 = self._data_t1.slicer[..., idx_slice:]
-            self._data_t2 = self._data_t2.slicer[..., idx_slice:]
-            self._data_vs = self._data_vs.slicer[..., idx_slice:]
-            self._data_cochlea = self._data_cochlea.slicer[..., idx_slice:] if self._data_cochlea is not None else None
+        slice_vs, slice_cochlea = self.get_non_zero_slices_segmentation()
+        if len(slice_cochlea) != 0:
+            return int(np.median(list(set(slice_vs).intersection(slice_cochlea))))
+        else:
+            return int(np.median(slice_vs))
 
     def plot_slice(self, slice_to_vis=None, figsize=(15, 15), cmap="gray"):
         """
