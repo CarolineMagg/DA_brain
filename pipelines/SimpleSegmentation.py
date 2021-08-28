@@ -8,7 +8,7 @@ import cv2
 import tensorflow as tf
 import numpy as np
 
-from data_utils.DataSet2DPaired import DataSet2DPaired
+from data_utils.DataSet2DMixed import DataSet2DMixed
 from losses.dice import DiceLoss, DiceCoefficient
 
 __author__ = "c.magg"
@@ -72,21 +72,21 @@ class SimpleSegmentation:
 
     def _load_data(self):
         """
-        Load data from training/validation folder with batch size, no augm and pixel value range [-1,1].
+        Load data from training/validation folder with batch size, no augm and pixel value range [0,1].
         Use only data where segmentation is available to ensure tumor presents.
         Training data - with shuffle, paired
         Validation data - with shuffle, paired
         """
 
         if self.data_type == "t1":
-            print("Training vs with t1.")
+            logging.info("SimpleSegmentation: Training vs with t1.")
 
             # dataset
-            self.train_set = DataSet2DPaired("/tf/workdir/data/VS_segm/VS_registered/training/",
-                                             input_data=["t1"], input_name=["image"],
-                                             output_data="vs", output_name="vs",
-                                             batch_size=self.batch_size, shuffle=True, use_filter="vs",
-                                             dsize=self.dsize, p_augm=0.0, alpha=-1, beta=1)
+            self.train_set = DataSet2DMixed("/tf/workdir/data/VS_segm/VS_registered/training/",
+                                            input_data=["t1"], input_name=["image"],
+                                            output_data="vs", output_name="vs",
+                                            batch_size=self.batch_size, shuffle=True, use_filter="vs",
+                                            dsize=self.dsize, p_augm=0.0, alpha=0, beta=1)
             self.train_set.augm_methods = [
                 A.ShiftScaleRotate(p=0.5, rotate_limit=15, border_mode=cv2.BORDER_CONSTANT),
                 A.VerticalFlip(p=0.5),
@@ -94,18 +94,18 @@ class SimpleSegmentation:
                          A.MedianBlur(p=0.5, blur_limit=5),
                          A.MotionBlur(p=0.5, blur_limit=(3, 5))], p=0.5)
             ]
-            self.val_set = DataSet2DPaired("/tf/workdir/data/VS_segm/VS_registered/validation/",
-                                           input_data=["t1"], input_name=["image"],
-                                           output_data="vs", output_name="vs", batch_size=self.batch_size, shuffle=True,
-                                           use_filter="vs", dsize=self.dsize, p_augm=0.0, alpha=-1, beta=1)
+            self.val_set = DataSet2DMixed("/tf/workdir/data/VS_segm/VS_registered/validation/",
+                                          input_data=["t1"], input_name=["image"],
+                                          output_data="vs", output_name="vs", batch_size=self.batch_size, shuffle=True,
+                                          use_filter="vs", dsize=self.dsize, p_augm=0.0, alpha=0, beta=1)
 
         elif self.data_type == "t2":
-            print("Training vs with t2.")
-            self.train_set = DataSet2DPaired("/tf/workdir/data/VS_segm/VS_registered/training/",
-                                             input_data=["t2"], input_name=["image"],
-                                             output_data="vs", output_name="vs",
-                                             batch_size=self.batch_size, shuffle=True, use_filter="vs",
-                                             dsize=self.dsize, p_augm=0.0, alpha=-1, beta=1)
+            logging.info("SimpleSegmentation: Training vs with t2.")
+            self.train_set = DataSet2DMixed("/tf/workdir/data/VS_segm/VS_registered/training/",
+                                            input_data=["t2"], input_name=["image"],
+                                            output_data="vs", output_name="vs",
+                                            batch_size=self.batch_size, shuffle=True, use_filter="vs",
+                                            dsize=self.dsize, p_augm=0.0, alpha=0, beta=1)
             self.train_set.augm_methods = [
                 A.ShiftScaleRotate(p=0.5, rotate_limit=15, border_mode=cv2.BORDER_CONSTANT),
                 A.VerticalFlip(p=0.5),
@@ -113,21 +113,21 @@ class SimpleSegmentation:
                          A.MedianBlur(p=0.5, blur_limit=5),
                          A.MotionBlur(p=0.5, blur_limit=(3, 5))], p=0.5)
             ]
-            self.val_set = DataSet2DPaired("/tf/workdir/data/VS_segm/VS_registered/validation/",
-                                           input_data=["t2"], input_name=["image"],
-                                           output_data="vs", output_name="vs",
-                                           batch_size=self.batch_size, shuffle=True, use_filter="vs", dsize=self.dsize,
-                                           p_augm=0.0, alpha=-1, beta=1)
+            self.val_set = DataSet2DMixed("/tf/workdir/data/VS_segm/VS_registered/validation/",
+                                          input_data=["t2"], input_name=["image"],
+                                          output_data="vs", output_name="vs",
+                                          batch_size=self.batch_size, shuffle=True, use_filter="vs", dsize=self.dsize,
+                                          p_augm=0.0, alpha=0, beta=1)
 
         elif self.data_type == "t1_t2":
-            print("Training vs with t1 and t2.")
+            logging.info("SimpleSegmentation: Training vs with t1 and t2.")
 
             # dataset
-            self.train_set = DataSet2DPaired("/tf/workdir/data/VS_segm/VS_registered/training/",
-                                             input_data=["t1", "t2"], input_name=["image", "t2"],
-                                             output_data="vs", output_name="vs",
-                                             batch_size=self.batch_size, shuffle=True, use_filter="vs",
-                                             dsize=self.dsize, p_augm=0.0)
+            self.train_set = DataSet2DMixed("/tf/workdir/data/VS_segm/VS_registered/training/",
+                                            input_data=["t1", "t2"], input_name=["image", "t2"],
+                                            output_data="vs", output_name="vs",
+                                            batch_size=self.batch_size, shuffle=True, use_filter="vs",
+                                            dsize=self.dsize, p_augm=0.0, alpha=0, beta=1)
             self.train_set.augm_methods = [
                 A.ShiftScaleRotate(p=0.5, rotate_limit=15, border_mode=cv2.BORDER_CONSTANT),
                 A.VerticalFlip(p=0.5),
@@ -135,11 +135,11 @@ class SimpleSegmentation:
                          A.MedianBlur(p=0.5, blur_limit=5),
                          A.MotionBlur(p=0.5, blur_limit=(3, 5))], p=0.5)
             ]
-            self.val_set = DataSet2DPaired("/tf/workdir/data/VS_segm/VS_registered/validation/",
-                                           input_data=["t1", "t2"], input_name=["image", "t2"],
-                                           output_data="vs", output_name="vs",
-                                           batch_size=self.batch_size, shuffle=True, use_filter="vs", dsize=self.dsize,
-                                           p_augm=0.0)
+            self.val_set = DataSet2DMixed("/tf/workdir/data/VS_segm/VS_registered/validation/",
+                                          input_data=["t1", "t2"], input_name=["image", "t2"],
+                                          output_data="vs", output_name="vs",
+                                          batch_size=self.batch_size, shuffle=True, use_filter="vs", dsize=self.dsize,
+                                          p_augm=0.0, alpha=0, beta=1)
 
         else:
             raise ValueError(f"Training {self.data_type} not valid.")

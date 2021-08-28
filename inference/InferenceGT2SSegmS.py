@@ -44,9 +44,6 @@ class InferenceGT2SSegmS:
         self._data_gen._beta = 1
         self._data_gen.shuffle = False
         self._data_gen.reset()
-        # self.source_data = tf.expand_dims(self._data_gen[0][0]["image"], -1)
-        # self.target_data = self._data_gen[0][0]["generated_t2"]
-        # self.segmentation = self._data_gen[0][1]["vs"]
 
     def infer(self, inputs, reference=None):
         """
@@ -62,7 +59,7 @@ class InferenceGT2SSegmS:
         if reference is not None:
             S_d_gen = self.D_S(S_generated)
             S_d_gt = self.D_S(reference)
-        segmentation = self.segmentor.predict((S_generated + 1) / 2 * 255)
+        segmentation = self.segmentor.predict((S_generated + 1) / 2)
         return S_generated, segmentation, S_d_gen, S_d_gt
 
     def evaluate(self, opt_batch_size=5):
@@ -102,7 +99,7 @@ class InferenceGT2SSegmS:
         assd = []
         for idx in range(len(self._data_gen)):
             inputs, outputs = self._data_gen[idx]
-            T2S, y_pred, T2S_d, S_d = self.infer(inputs["generated_t2"], inputs["image"])
+            T2S, y_pred, T2S_d, S_d = self.infer(inputs["t2"], inputs["image"])
             for idx in range(len(T2S)):
                 thres, y_pred_thres = cv2.threshold(y_pred[idx][:, :, 0], 0.5, 1, cv2.THRESH_BINARY)
                 S_pred.append(T2S[idx])
@@ -110,7 +107,7 @@ class InferenceGT2SSegmS:
                 S_pred_d.append(T2S_d[idx])
                 S_gt_d.append(S_d[idx])
                 S_inputs.append(inputs["image"][idx])
-                T_inputs.append(inputs["generated_t2"][idx])
+                T_inputs.append(inputs["t2"][idx])
                 segm_gt.append(outputs["vs"][idx])
                 dc.append(metric.binary.dc(y_pred_thres, outputs["vs"][idx]))
                 if np.sum(y_pred_thres) != 0:

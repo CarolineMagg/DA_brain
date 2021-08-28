@@ -44,7 +44,7 @@ if __name__ == "__main__":
     data_nr = args.data_nr if args.data_nr != 0 else None
     step_decay = args.step_decay if args.step_decay != 0 else None
 
-    identifier = f"gan_{seed}"
+    identifier = f"gan_{d_step}_{epochs}_{step_decay}_{seed}"
     tensorboard_dir = f"/tf/workdir/DA_brain/logs/{identifier}/"
     checkpoints_dir = f"/tf/workdir/DA_brain/saved_models/{identifier}/checkpoints/"
     save_model_dir = f"/tf/workdir/DA_brain/saved_models/{identifier}/"

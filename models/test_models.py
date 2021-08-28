@@ -65,8 +65,8 @@ class TestUNetClassGuided(TestCase):
         print(model.summary())
 
     def test_generate_model_multiple_input_multiple_output(self):
-        model = UNet_ClassGuided(activation="selu", input_shape=(256, 256, 1), input_name=["t1", "t2"],
-                                 output_name=["mask", "mask1", "mask_class"]).generate_model()
+        model = UNet_ClassGuided(activation="selu", input_shape=(256, 256, 1), input_name="t1",
+                                 output_name=["mask", "mask_class"]).generate_model()
         print(model.summary())
 
     def test_run(self):
