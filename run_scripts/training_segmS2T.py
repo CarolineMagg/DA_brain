@@ -45,7 +45,7 @@ if __name__ == "__main__":
     data_nr = args.data_nr if args.data_nr != 0 else None
     step_decay = args.step_decay if args.step_decay != 0 else None
 
-    identifier = f"segmS2T_{seed}"
+    identifier = f"segmS2T_{model_type}_{epochs}_{step_decay}_{seed}"
     tensorboard_dir = f"/tf/workdir/DA_brain/logs/{identifier}/"
     checkpoints_dir = f"/tf/workdir/DA_brain/saved_models/{identifier}/checkpoints/"
     save_model_dir = f"/tf/workdir/DA_brain/saved_models/{identifier}/"

@@ -25,8 +25,7 @@ __author__ = "c.magg"
 class SegmS2T:
 
     def __init__(self, data_dir, tensorboard_dir, checkpoints_dir, save_model_dir, sample_dir,
-                 seed=13375, d_step=1, sample_step=500, segm_epoch=10,
-                 cycle_loss_weight=10.0, identity_loss_weight=1.0, activation="relu",
+                 seed=13375, sample_step=500, activation="relu",
                  dsize=(256, 256), batch_size=1, model_type="XNet"):
         """
         SegmS2T pipeline, ie segmentation training on synthetic T data.
@@ -47,12 +46,8 @@ class SegmS2T:
             os.makedirs(sample_dir)
 
         # parameters
-        self.cycle_loss_weight = cycle_loss_weight
-        self.identity_loss_weight = identity_loss_weight
-        self.d_step = d_step
         self.sample_step = sample_step
         self.dsize = dsize
-        self.segm_epoch = segm_epoch
         self.batch_size = batch_size
 
         # data
@@ -62,9 +57,9 @@ class SegmS2T:
         self._load_data()
 
         # generator
-        self.G_S2T = tf.keras.models.load_model("/tf/workdir/DA_brain/saved_models/gan_13785/G_S2T")
+        self.G_S2T = tf.keras.models.load_model("/tf/workdir/DA_brain/saved_models/gan_10_100_50_13785/G_S2T")
 
-        # segmentation
+        # segmentation network
         if model_type == "XNet":
             logging.info("SegmS2T: using XNet.")
             self.model = XNet(input_shape=(256, 256, 1), output_classes=1,
@@ -135,7 +130,7 @@ class SegmS2T:
         S2T = self.G_S2T(S, training=False)
         with tf.GradientTape() as tape:
             # segmentation with synthetic T
-            pred = self.model(S2T, training=True)
+            pred = self.model((S2T+1)/2, training=True)
 
             # loss and metrics
             dice_loss = DiceLoss()(S_mask, pred)
@@ -194,8 +189,8 @@ class SegmS2T:
         Generate samples from current generators.
         """
         S2T = self.G_S2T(S, training=False)
-        T_segm = self.model(T, training=False)
-        S2T_segm = self.model(S2T, training=False)
+        T_segm = self.model((T+1)/2, training=False)
+        S2T_segm = self.model((S2T+1)/2, training=False)
         return S2T, S2T_segm, T_segm
 
     def train(self, epochs=50, data_nr=None, restore=True, step_decay=None):
@@ -258,12 +253,11 @@ class SegmS2T:
                     S2T, S2T_segm, T_segm = self.sample(A, B)
                     img = np.hstack(
                         np.concatenate(
-                            [tf.expand_dims(A, -1), tf.expand_dims(A + A_mask * 3, -1), S2T + S2T_segm * 3,
-                             tf.expand_dims(B, -1), tf.expand_dims(B, -1) + T_segm * 3,
-                             tf.expand_dims(B + B_mask * 3, -1)], axis=0))
+                            [tf.expand_dims(A, -1), tf.expand_dims(A + A_mask * 2, -1), S2T + S2T_segm * 2,
+                             tf.expand_dims(B, -1), tf.expand_dims(B + B_mask * 2, -1),
+                             tf.expand_dims(B, -1) + T_segm * 2], axis=0))
                     img = cv2.normalize(img, img, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
-                    cv2.imwrite(os.path.join(self.dir_sample, 'iter-%03d-%05d.jpg' % (epoch, idx)),
-                                img)
+                    cv2.imwrite(os.path.join(self.dir_sample, 'iter-%03d-%05d.jpg' % (epoch, idx)), img)
                     sample_counter = sample_counter + 1
                     if sample_counter >= len(self.val_set):
                         sample_counter = 0
