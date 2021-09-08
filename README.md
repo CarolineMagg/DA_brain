@@ -35,11 +35,11 @@ The data folder should be called `data/VS_segm/VS_registered` and should have th
 |           +-- validation       
 ```
 
-Some run scripts contain the relative paths as outlined above.
+Some run scripts and notebooks contain the relative/absolute paths as outlined above.
 
 ### Data split
 
-The split training/test split was 80:20 and the training data is split again into 80:20. The split can be performed by calling `GenerateSplit.py`.
+The split training/test split was 80:20 and the training data is split again into 80:20. The split can be performed by calling `data_utils/GenerateSplit.py`.
 
 | Dataset    | # samples | numbers (excl.)          |
 | ---------- |:---------:| ------------------------:|
@@ -47,10 +47,14 @@ The split training/test split was 80:20 and the training data is split again int
 | validation | 39        | 159 - 199 (160,168)      |
 | test       | 48        | 200 - 250 (208,219,227)  |
 
+### Remove empty slices
+
+There are empty (all-zero) slices in T1 and T2 scans. In order to remove them, call `data_utils/RemoveEmptySlices.py`. This will first create a .json file storing the first and last non-empty slice index and then, remove the empty slices in the entire volume (T1, T2, VS segmentation, Cochlea segmentation if available).
+
 ### Data Preprocessing
 
 The data preprocessing performed in `DataSet2D` and `DataSet2DMixed` are based on data statistics and informations.
-After the data has the structure discribed above, the script `GenerateStatistics.py` generates a json file in each patient folder with the infromation necessary for preprocessing. In order to apply the script, the dataset split needs to be performed first.
+After the data has the structure discribed above, the script `data_utils/GenerateStatistics.py` generates a json file in each patient folder with the infromation necessary for preprocessing. In order to apply the script, the dataset split and the empty slice removal need to be done first.
 
 ## Docker & Requirements
 You can use [Docker](https://www.docker.com/) to setup your environment. For installation guide see [Install Docker](https://docs.docker.com/get-docker/). <br> 
