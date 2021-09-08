@@ -13,9 +13,10 @@ Extracting data:
 1. download data from [TCIA](https://wiki.cancerimagingarchive.net/pages/viewpage.action?pageId=70229053): <br>
 Images and Radiation Therapy Structures, registration matrices, contours
 2. extract data with NBIA Data Retriever with 'Descriptive Directory format'.
-3. follow [instructions](https://github.com/KCL-BMEIS/VS_Seg/tree/master/preprocessing) to:
+3. follow [instructions](https://github.com/KCL-BMEIS/VS_Seg/tree/master/preprocessing) in order to:
 * convert the original folder structure to a more convenient folder structure and file names
 * convert DICOM images and segmentations into NIFTI files
+* register T2 images to T1 images
 
 This structure is required since the `DataContainer` and the different `DataSet2D` are tailored to deal with it.
 
@@ -38,18 +39,18 @@ Some run scripts contain the relative paths as outlined above.
 
 ### Data split
 
-The split training/test split was 80:20 and the training data is split again into 80:20. 
+The split training/test split was 80:20 and the training data is split again into 80:20. The split can be performed by calling `GenerateSplit.py`.
 
 | Dataset    | # samples | numbers (excl.)          |
 | ---------- |:---------:| ------------------------:|
-| train      | 154       | 1 - 157 (39,97,130)      |
-| validation | 38        | 158 - 197 (160,168)      |
-| test       | 50        | 198 - 250 (208,219,227)  |
+| train      | 155       | 1 - 158 (39,97,130)      |
+| validation | 39        | 159 - 199 (160,168)      |
+| test       | 48        | 200 - 250 (208,219,227)  |
 
 ### Data Preprocessing
 
 The data preprocessing performed in `DataSet2D` and `DataSet2DMixed` are based on data statistics and informations.
-After the data has the structure discribed above, the script `GenerateStatistics.py` generates a json file in each patient folder with the infromation necessary for preprocessing.
+After the data has the structure discribed above, the script `GenerateStatistics.py` generates a json file in each patient folder with the infromation necessary for preprocessing. In order to apply the script, the dataset split needs to be performed first.
 
 ## Docker & Requirements
 You can use [Docker](https://www.docker.com/) to setup your environment. For installation guide see [Install Docker](https://docs.docker.com/get-docker/). <br> 
