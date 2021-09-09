@@ -1,5 +1,5 @@
 ########################################################################################################################
-# DataSet for Tensorflow trainings pipeline
+# DataSet Mixed for Tensorflow trainings pipeline
 ########################################################################################################################
 import numpy as np
 import matplotlib.pyplot as plt
@@ -24,7 +24,7 @@ class DataSet2DMixed(DataSet2D):
     def __init__(self, dataset_folder, batch_size=4,
                  input_data="t1", input_name="image",
                  output_data=["t2", "vs", "vs_class"], output_name=["image_output", "vs_output"],
-                 shuffle=True, p_augm=0.0, use_filter=None, use_balance=False,
+                 shuffle=True, p_augm=0.0, use_filter=None, use_balance=False, segm_size=None, paired=False,
                  dsize=(256, 256), alpha=0, beta=1, seed=13375):
         """
         Create a new DataSet2D object.
@@ -38,20 +38,18 @@ class DataSet2DMixed(DataSet2D):
         """
 
         self.index_pairwise_output = []
-        self._unpaired = True
+        self._paired = paired
         super(DataSet2DMixed, self).__init__(dataset_folder, batch_size=batch_size,
                                              input_data=input_data, input_name=input_name,
-                                             shuffle=shuffle, p_augm=p_augm, use_filter=use_filter,
+                                             shuffle=shuffle, p_augm=p_augm, use_filter=use_filter, segm_size=segm_size,
                                              use_balance=use_balance, dsize=dsize, alpha=alpha, beta=beta, seed=seed)
 
         # output data
         self._output_name = output_name if type(output_name) == list else [output_name]
         self._output_data = output_data if type(output_data) == list else [output_data]
         self._mapping_data_name.update({k: v for k, v in zip(self._output_data, self._output_name)})
-        assert len(self._output_data) == len(self._output_name)
-
-        # only one input allowed!
-        # assert len(self._input_name) == 1
+        assert len(self._output_data) == len(
+            self._output_name), "Number of output data and output names is not matching."
 
         self._augm_methods = [
             A.ShiftScaleRotate(p=0.5, rotate_limit=15, border_mode=cv2.BORDER_CONSTANT),
@@ -103,7 +101,10 @@ class DataSet2DMixed(DataSet2D):
         assert len(indices) == len(indices_output)
         if len(indices) == 0:
             raise ValueError(
-                "DataSet: Indices length is 0 with item {0} of {1}".format(item, self._number_index // self.batch_size))
+                "DataSet2D: Indices length is 0 with item {0} of {1}".format(item,
+                                                                             self._number_index // self.batch_size))
+        if len(indices) < self.batch_size:
+            raise ValueError("DataSet2D: Batch size is too large, not enough data samples available.")
         data = [dict()] * self.batch_size
         for inputs, outputs in zip(enumerate(indices), enumerate(indices_output)):
             idx = inputs[0]
@@ -172,11 +173,11 @@ class DataSet2DMixed(DataSet2D):
         self.index_pairwise = [(idx, n) for idx, d in enumerate(self._data) for n in range(len(d))] if len(
             self.list_index) == 0 else self.list_index
         self.index_pairwise_output = self.index_pairwise
-        if self._unpaired:
+        if not self._paired:
             self.index_pairwise_output = np.random.permutation(self.index_pairwise_output)
         if self._shuffle:
             self.index_pairwise = np.random.permutation(self.index_pairwise)
-            if not self._unpaired:
+            if self._paired:
                 self.index_pairwise_output = self.index_pairwise
 
     def plot_random_images(self, nrows=4, ncols=2):

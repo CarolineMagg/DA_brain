@@ -11,6 +11,7 @@ import cv2
 import tensorflow as tf
 from random import randrange
 import albumentations as A
+from natsort import natsorted
 
 from data_utils.DataContainer import DataContainer
 
@@ -25,7 +26,7 @@ class DataSet2D(tf.keras.utils.Sequence):
 
     def __init__(self, dataset_folder, batch_size=4,
                  input_data="t1", input_name="image",
-                 shuffle=True, p_augm=0.0, use_filter=None, use_balance=False,
+                 shuffle=True, p_augm=0.0, use_filter=None, use_balance=False, segm_size=None,
                  dsize=(256, 256), alpha=0, beta=1, seed=13375):
         """
         Create a new DataSet2D object.
@@ -35,7 +36,7 @@ class DataSet2D(tf.keras.utils.Sequence):
 
         # dataset folder
         self._path_dataset = dataset_folder
-        self._folders = os.listdir(self._path_dataset)
+        self._folders = natsorted(os.listdir(self._path_dataset))
 
         # load data
         self._data = []
@@ -43,7 +44,8 @@ class DataSet2D(tf.keras.utils.Sequence):
 
         # set indices
         self.list_index = []
-        self._number_index = int(np.sum([len(d) for d in self._data])) if len(self.list_index) == 0 else len(self.list_index)
+        self._number_index = int(np.sum([len(d) for d in self._data])) if len(self.list_index) == 0 else len(
+            self.list_index)
         self.index_pairwise = []
         self._shuffle = shuffle
         random.seed(13371984)
@@ -54,11 +56,11 @@ class DataSet2D(tf.keras.utils.Sequence):
         self._input_name = input_name if type(input_name) == list else [input_name]
         self._input_data = input_data if type(input_data) == list else [input_data]
         self._mapping_data_name = {k: v for k, v in zip(self._input_data, self._input_name)}
-        assert len(self._input_data) == len(self._input_name)
+        assert len(self._input_data) == len(self._input_name), "Number of input data and input names is not matching."
 
         self._alpha = alpha
         self._beta = beta
-        self._dsize = dsize
+        self._dsize = dsize if dsize is not None else (448, 448)
         self._p_augm = p_augm
         self._augm_methods = [
             A.ShiftScaleRotate(p=0.5, rotate_limit=15, border_mode=cv2.BORDER_CONSTANT),
@@ -68,8 +70,14 @@ class DataSet2D(tf.keras.utils.Sequence):
                      A.MotionBlur(p=0.5, blur_limit=(3, 5))], p=0.5)
         ]
         self._filter = use_filter
+        if self._filter is not None and segm_size is not None:
+            logging.warning("DataSet2D: It is inefficient to use 'filter' and 'segm_size' at the same time. \
+            And the behavior might not lead to the same results.")
         if self._filter is not None:
             self.reduce_to_nonzero_segm(self._filter)
+        self._segm_size = segm_size
+        if self._segm_size is not None:
+            self.reduce_greater_than_val_segm()
         self._balance = use_balance
         if self._balance:
             self.balance_dataset()
@@ -176,7 +184,10 @@ class DataSet2D(tf.keras.utils.Sequence):
                   self.batch_size * item:self.batch_size * item + self.batch_size]
         if len(indices) == 0:
             raise ValueError(
-                "DataSet: Indices length is 0 with item {0} of {1}".format(item, self._number_index // self.batch_size))
+                "DataSet2D: Indices length is 0 with item {0} of {1}".format(item,
+                                                                             self._number_index // self.batch_size))
+        if len(indices) < self.batch_size:
+            raise ValueError("DataSet2D: Batch size is too large, not enough data samples available.")
         data = [dict()] * self.batch_size
         for idx, ind in enumerate(indices):
             data[idx] = self._next_data_item(ind)
@@ -246,7 +257,6 @@ class DataSet2D(tf.keras.utils.Sequence):
         for k in image_keys:
             data[k] = ((data[k] - np.min(data[k])) / (np.max(data[k]) - np.min(data[k]))) * (
                     self.beta - self.alpha) + self.alpha
-            # cv2.normalize(data[k], None, alpha=self._alpha, beta=self._beta, norm_type=cv2.NORM_MINMAX)
         return data
 
     def _load_data(self):
@@ -262,7 +272,8 @@ class DataSet2D(tf.keras.utils.Sequence):
         """
         Reset indices and shuffle randomly if necessary.
         """
-        self.index_pairwise = [(idx, n) for idx, d in enumerate(self._data) for n in range(len(d))] if len(self.list_index) == 0 else self.list_index
+        self.index_pairwise = [(idx, n) for idx, d in enumerate(self._data) for n in range(len(d))] if len(
+            self.list_index) == 0 else self.list_index
         if self._shuffle:
             self.index_pairwise = np.random.permutation(self.index_pairwise)
 
@@ -273,9 +284,12 @@ class DataSet2D(tf.keras.utils.Sequence):
         """
         len_before = self._number_index
         logging.info(f"DataSet2D: filtering {len_before} data points for {structure}...")
-        for d in self._data:
-            d.reduce_to_nonzero_segm(structure)
-        self._number_index = int(np.sum([len(d) for d in self._data]))
+        for idx, d in enumerate(self._data):
+            idx_vs_nonzero = d.get_non_zero_slices_segmentation()
+            self.list_index += [(idx, ix) for ix in sorted(idx_vs_nonzero)]
+            # d.reduce_to_nonzero_segm(structure)
+        self._number_index = int(np.sum([len(d) for d in self._data])) if len(self.list_index) == 0 else len(
+            self.list_index)
         len_after = self._number_index
         self.reset()
         logging.info(
@@ -284,21 +298,38 @@ class DataSet2D(tf.keras.utils.Sequence):
     def balance_dataset(self):
         """
         Balance each data container to have equal number of slices with/without the structure.
-        :param structure: identifier for structure to use for balancing - default: vs segmentation
         """
         self.list_index = []
         len_before = self._number_index
         logging.info(f"DataSet2D: balancing {len_before} data points for vs_class...")
         for idx, d in enumerate(self._data):
-            idx_vs_nonzero, _ = d.get_non_zero_slices_segmentation()
+            idx_vs_nonzero = d.get_non_zero_slices_segmentation()
             idx_vs_zero = d.get_zero_slices_segmentation()
             blub = random.sample(idx_vs_zero, k=len(idx_vs_nonzero))
             self.list_index += [(idx, ix) for ix in sorted(blub + idx_vs_nonzero)]
-        self._number_index = int(np.sum([len(d) for d in self._data])) if len(self.list_index) == 0 else len(self.list_index)
+        self._number_index = int(np.sum([len(d) for d in self._data])) if len(self.list_index) == 0 else len(
+            self.list_index)
         len_after = self._number_index
         self.reset()
         logging.info(
             f"DataSet2D: balancing removed {len_before - len_after} data points. remaining {len_after}.")
+
+    def reduce_greater_than_val_segm(self):
+        """
+        Reduce each data container to segmentation slices that has at least val non-zero px
+        - should keep only relevant information.
+        """
+        self.list_index = []
+        len_before = self._number_index
+        logging.info(f"DataSet2D: filtering {len_before} data points for segm size...")
+        for idx, d in enumerate(self._data):
+            self.list_index += [(idx, ix) for ix in d.get_val_slices_segmentation(self._segm_size, self._dsize)]
+        self._number_index = int(np.sum([len(d) for d in self._data])) if len(self.list_index) == 0 else len(
+            self.list_index)
+        len_after = self._number_index
+        self.reset()
+        logging.info(
+            f"DataSet2D: filtering removed {len_before - len_after} data points. remaining {len_after}.")
 
     def plot_random_images(self, nrows=2, ncols=2):
         """

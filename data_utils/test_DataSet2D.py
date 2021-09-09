@@ -3,6 +3,7 @@ import unittest
 from unittest import TestCase
 import numpy as np
 import logging
+
 logging.basicConfig(level=logging.DEBUG)
 
 from data_utils.DataSet2D import DataSet2D
@@ -34,7 +35,7 @@ class TestDataSet2D(TestCase):
         self.assertEqual(0.0, train_set.p_augm)
         self.assertEqual((256, 256), train_set.dsize)
         self.assertEqual(True, train_set.shuffle)
-        self.assertEqual(10425, len(train_set))
+        self.assertEqual(10400, len(train_set))
         self.assertListEqual(["image"], train_set._input_name)
         self.assertListEqual(["t1"], train_set._input_data)
 
@@ -44,8 +45,8 @@ class TestDataSet2D(TestCase):
         self.assertEqual(0.5, train_set.p_augm)
         self.assertEqual((256, 256), train_set.dsize)
         self.assertEqual(False, train_set.shuffle)
-        self.assertEqual(2606, len(train_set))
-        self.assertEqual(10425, train_set._number_index)
+        self.assertEqual(2600, len(train_set))
+        self.assertEqual(10400, train_set._number_index)
         self.assertListEqual(["image"], train_set._input_name)
         self.assertListEqual(["t1"], train_set._input_data)
 
@@ -54,21 +55,22 @@ class TestDataSet2D(TestCase):
         self.assertListEqual(["image", "image_aux"], train_set._input_name)
         self.assertListEqual(["t1", "t2"], train_set._input_data)
 
-    def test_check_for_empty_slices(self):
+    @unittest.skip
+    def test_check_for_empty_slices_t1(self):
         np.random.seed(5)
         train_set = DataSet2D("../../data/VS_segm/VS_registered/training/", input_data=["t1"],
-                              input_name=["image"], batch_size=1, shuffle=True, use_filter="vs")
-        train_set.batch_size = 10450 // 50
+                              input_name=["image"], batch_size=1, shuffle=True)
+        train_set.batch_size = 10400 // 50
         for idx in range(len(train_set)):
             res = train_set[idx]
-            blub = [idx for idx, r in enumerate(res["image"]) if np.sum(r)==0]
+            blub = [idx for idx, r in enumerate(res["image"]) if np.sum(r) == 0]
             if len(blub) != 0:
                 print(f"idx {blub} is empty.")
 
         np.random.seed(5)
         train_set = DataSet2D("../../data/VS_segm/VS_registered/validation/", input_data=["t1"],
-                              input_name=["image"], batch_size=1, shuffle=True, use_filter="vs")
-        train_set.batch_size = 2960 // 16
+                              input_name=["image"], batch_size=1, shuffle=True)
+        train_set.batch_size = 3016 // 16
         for idx in range(len(train_set)):
             res = train_set[idx]
             blub = [idx for idx, r in enumerate(res["image"]) if np.sum(r) == 0]
@@ -77,8 +79,40 @@ class TestDataSet2D(TestCase):
 
         np.random.seed(5)
         train_set = DataSet2D("../../data/VS_segm/VS_registered/test/", input_data=["t1"],
-                              input_name=["image"], batch_size=1, shuffle=True, use_filter="vs")
-        train_set.batch_size = 3960 // 30
+                              input_name=["image"], batch_size=1, shuffle=True)
+        train_set.batch_size = 3708 // 30
+        for idx in range(len(train_set)):
+            res = train_set[idx]
+            blub = [idx for idx, r in enumerate(res["image"]) if np.sum(r) == 0]
+            if len(blub) != 0:
+                print(f"idx {blub} is empty.")
+
+    @unittest.skip
+    def test_check_for_empty_slices_t2(self):
+        np.random.seed(5)
+        train_set = DataSet2D("../../data/VS_segm/VS_registered/training/", input_data=["t2"],
+                              input_name=["image"], batch_size=1, shuffle=True)
+        train_set.batch_size = 10400 // 50
+        for idx in range(len(train_set)):
+            res = train_set[idx]
+            blub = [idx for idx, r in enumerate(res["image"]) if np.sum(r) == 0]
+            if len(blub) != 0:
+                print(f"idx {blub} is empty.")
+
+        np.random.seed(5)
+        train_set = DataSet2D("../../data/VS_segm/VS_registered/validation/", input_data=["t2"],
+                              input_name=["image"], batch_size=1, shuffle=True)
+        train_set.batch_size = 3016 // 16
+        for idx in range(len(train_set)):
+            res = train_set[idx]
+            blub = [idx for idx, r in enumerate(res["image"]) if np.sum(r) == 0]
+            if len(blub) != 0:
+                print(f"idx {blub} is empty.")
+
+        np.random.seed(5)
+        train_set = DataSet2D("../../data/VS_segm/VS_registered/test/", input_data=["t2"],
+                              input_name=["image"], batch_size=1, shuffle=True)
+        train_set.batch_size = 3708 // 30
         for idx in range(len(train_set)):
             res = train_set[idx]
             blub = [idx for idx, r in enumerate(res["image"]) if np.sum(r) == 0]
@@ -109,16 +143,20 @@ class TestDataSet2D(TestCase):
         self.assertEqual([], train_set.augm_methods)
 
     def test_reduce_to_nonzero_segm(self):
-        train_set = DataSet2D("../../data/VS_segm/VS_registered/training/", input_data=["t1"],
-                              input_name=["image"], batch_size=4, shuffle=True, p_augm=0.0)
-        train_set.reduce_to_nonzero_segm("vs")
-        self.assertEqual(377, len(train_set))
+        train_set1 = DataSet2D("../../data/VS_segm/VS_registered/training/", input_data=["t1"],
+                               input_name=["image"], batch_size=1, shuffle=False, p_augm=0.0)
+        train_set1.reduce_to_nonzero_segm("vs")
+
+        train_set2 = DataSet2D("../../data/VS_segm/VS_registered/training/", input_data=["t1"],
+                               input_name=["image"], batch_size=1, shuffle=False, p_augm=0.0, segm_size=0)
+        self.assertEqual(1677, len(train_set1))
+        self.assertEqual(1675, len(train_set2))
 
     def test_balance_data(self):
         train_set = DataSet2D("../../data/VS_segm/VS_registered/training/", input_data=["t1"],
                               input_name=["image"], batch_size=4, shuffle=True, p_augm=0.0)
         train_set.balance_dataset()
-        self.assertEqual(831, len(train_set))
+        self.assertEqual(838, len(train_set))
 
     def test_single_result(self):
         train_set = DataSet2D("../../data/VS_segm/VS_registered/training/", input_data=["t1"],
@@ -157,7 +195,7 @@ class TestDataSet2DMixed(TestCase):
         self.assertEqual(0.0, train_set.p_augm)
         self.assertEqual((256, 256), train_set.dsize)
         self.assertEqual(True, train_set.shuffle)
-        self.assertEqual(10425, len(train_set))
+        self.assertEqual(10400, len(train_set))
         self.assertListEqual(["image"], train_set._input_name)
         self.assertListEqual(["image_t2", "mask", "class1"], train_set._output_name)
         self.assertListEqual(["t1"], train_set._input_data)
@@ -170,12 +208,58 @@ class TestDataSet2DMixed(TestCase):
         self.assertEqual(0.5, train_set.p_augm)
         self.assertEqual((256, 256), train_set.dsize)
         self.assertEqual(False, train_set.shuffle)
-        self.assertEqual(2606, len(train_set))
-        self.assertEqual(10425, train_set._number_index)
+        self.assertEqual(2600, len(train_set))
+        self.assertEqual(10400, train_set._number_index)
         self.assertListEqual(["image"], train_set._input_name)
         self.assertListEqual(["t2_", "cochlea_"], train_set._output_name)
         self.assertListEqual(["t1"], train_set._input_data)
         self.assertListEqual(["t2", "cochlea"], train_set._output_data)
+
+    @unittest.skip
+    def test_check_for_segm_size(self):
+        np.random.seed(5)
+        train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data=["t1"],
+                                   input_name=["image"], output_data=["vs"], output_name=["vs"],
+                                   batch_size=1, shuffle=True, segm_size=20, dsize=(448, 448))
+        train_set.batch_size = 10
+        for idx in range(len(train_set)):
+            res = train_set[idx]
+            blub = [idx for idx, r in enumerate(res[1]["vs"]) if np.sum(r) < 20]
+            if len(blub) != 0:
+                print(f"{idx} {blub} do not fulfill requirement.")
+
+        np.random.seed(5)
+        train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data=["t1"],
+                                   input_name=["image"], output_data=["vs"], output_name=["vs"],
+                                   batch_size=1, shuffle=True, segm_size=30, dsize=(256, 256))
+        train_set.batch_size = 10
+        for idx in range(len(train_set)):
+            res = train_set[idx]
+            blub = [idx for idx, r in enumerate(res[1]["vs"]) if np.sum(r) < 30]
+            if len(blub) != 0:
+                print(f"{idx} {blub} do not fulfill requirement.")
+
+        np.random.seed(5)
+        train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/validation/", input_data=["t1"],
+                                   input_name=["image"], output_data=["vs"], output_name=["vs"],
+                                   batch_size=1, shuffle=True, segm_size=10, dsize=(448, 448))
+        train_set.batch_size = 10
+        for idx in range(len(train_set)):
+            res = train_set[idx]
+            blub = [idx for idx, r in enumerate(res[1]["vs"]) if np.sum(r) < 10]
+            if len(blub) != 0:
+                print(f"idx {blub} do not fulfill requirement.")
+
+        np.random.seed(5)
+        train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/test/", input_data=["t1"],
+                                   input_name=["image"], output_data=["vs"], output_name=["vs"],
+                                   batch_size=1, shuffle=True, segm_size=100, dsize=(448, 448))
+        train_set.batch_size = 10
+        for idx in range(len(train_set)):
+            res = train_set[idx]
+            blub = [idx for idx, r in enumerate(res[1]["vs"]) if np.sum(r) < 100]
+            if len(blub) != 0:
+                print(f"idx {blub} do not fulfill requirement.")
 
     def test_init_only_segm(self):
         train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data="t1",
@@ -186,15 +270,25 @@ class TestDataSet2DMixed(TestCase):
         self.assertEqual(0.5, train_set.p_augm)
         self.assertEqual((256, 256), train_set.dsize)
         self.assertEqual(False, train_set.shuffle)
-        self.assertEqual(2606, len(train_set))
-        self.assertEqual(10425, train_set._number_index)
+        self.assertEqual(2600, len(train_set))
+        self.assertEqual(10400, train_set._number_index)
         self.assertListEqual(["image"], train_set._input_name)
         self.assertListEqual(["vs", "cochlea", "vs_class"], train_set._output_name)
         self.assertListEqual(["t1"], train_set._input_data)
         self.assertListEqual(["vs", "cochlea", "vs_class"], train_set._output_data)
-        #train_set.plot_random_images(2, 2)
+        # train_set.plot_random_images(2, 2)
 
     def test_init_only_images(self):
+        train_set_all = DataSet2DMixed("/tf/workdir/data/VS_segm/VS_registered/training",
+                                       input_data="t1", input_name="image",
+                                       output_data="t2", output_name="t2", use_filter="vs",
+                                       batch_size=1, shuffle=False, p_augm=0.0, dsize=(256, 256),
+                                       alpha=-1, beta=1)
+        train_set_all.batch_size = 2909
+        self.assertRaises(ValueError, train_set_all._next, 0)
+        train_set_all.batch_size = 4
+        data = train_set_all[0]
+
         train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data="t1",
                                    input_name="image", output_data=["t2"],
                                    output_name=["t2_"],
@@ -203,21 +297,19 @@ class TestDataSet2DMixed(TestCase):
         self.assertEqual(0.5, train_set.p_augm)
         self.assertEqual((256, 256), train_set.dsize)
         self.assertEqual(False, train_set.shuffle)
-        self.assertEqual(2606, len(train_set))
-        self.assertEqual(10425, train_set._number_index)
+        self.assertEqual(2600, len(train_set))
+        self.assertEqual(10400, train_set._number_index)
         self.assertListEqual(["image"], train_set._input_name)
         self.assertListEqual(["t2_"], train_set._output_name)
         self.assertListEqual(["t1"], train_set._input_data)
         self.assertListEqual(["t2"], train_set._output_data)
-        #train_set.plot_random_images(2, 2)
+        # train_set.plot_random_images(2, 2)
 
         train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data="t1",
                                    input_name="image", output_data=["t2"],
-                                   output_name=["t2_"],
+                                   output_name=["t2_"], paired=True,
                                    batch_size=4, shuffle=False, p_augm=0.5)
-        train_set._unpaired = False
-        train_set.reset()
-        #train_set.plot_random_images(2, 2)
+        # train_set.plot_random_images(2, 2)
 
     def test_init_multi_images_segm(self):
         train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data=["t1", "t2"],
@@ -228,8 +320,8 @@ class TestDataSet2DMixed(TestCase):
         self.assertEqual(0.5, train_set.p_augm)
         self.assertEqual((256, 256), train_set.dsize)
         self.assertEqual(False, train_set.shuffle)
-        self.assertEqual(377, len(train_set))
-        self.assertEqual(1509, train_set._number_index)
+        self.assertEqual(419, len(train_set))
+        self.assertEqual(1677, train_set._number_index)
         self.assertListEqual(["image", "t2_"], train_set._input_name)
         self.assertListEqual(["vs_"], train_set._output_name)
         self.assertListEqual(["t1", "t2"], train_set._input_data)
@@ -245,13 +337,27 @@ class TestDataSet2DMixed(TestCase):
         self.assertEqual(0.5, train_set.p_augm)
         self.assertEqual((256, 256), train_set.dsize)
         self.assertEqual(False, train_set.shuffle)
-        self.assertEqual(2606, len(train_set))
-        self.assertEqual(10425, train_set._number_index)
+        self.assertEqual(2600, len(train_set))
+        self.assertEqual(10400, train_set._number_index)
         self.assertListEqual(["image"], train_set._input_name)
         self.assertListEqual(["vs_class_"], train_set._output_name)
         self.assertListEqual(["t1"], train_set._input_data)
         self.assertListEqual(["vs_class"], train_set._output_data)
-        #train_set.plot_random_images(2, 2)
+        # train_set.plot_random_images(2, 2)
+
+    def test_segm_size(self):
+        train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data="t1",
+                                   input_name="image", output_data=["vs", "vs_class"],
+                                   output_name=["vs_", "vs_class_"], segm_size=10,
+                                   batch_size=16, shuffle=False, p_augm=0.0, seed=56459)
+        self.assertEqual(10, train_set._segm_size)
+        self.assertEqual(99, len(train_set))
+        self.assertEqual(1599, train_set._number_index)
+        self.assertListEqual(["image"], train_set._input_name)
+        self.assertListEqual(["vs_", "vs_class_"], train_set._output_name)
+        self.assertListEqual(["t1"], train_set._input_data)
+        self.assertListEqual(["vs", "vs_class"], train_set._output_data)
+        # train_set.plot_random_images(2, 4)
 
     def test_init_only_class_balanced(self):
         train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data="t1",
@@ -262,8 +368,8 @@ class TestDataSet2DMixed(TestCase):
         self.assertEqual(0.5, train_set.p_augm)
         self.assertEqual((256, 256), train_set.dsize)
         self.assertEqual(False, train_set.shuffle)
-        self.assertEqual(831, len(train_set))
-        self.assertEqual(3326, train_set._number_index)
+        self.assertEqual(838, len(train_set))
+        self.assertEqual(3354, train_set._number_index)
         self.assertListEqual(["image"], train_set._input_name)
         self.assertListEqual(["vs_class_"], train_set._output_name)
         self.assertListEqual(["t1"], train_set._input_data)
@@ -315,7 +421,7 @@ class TestDataSet2DMixed(TestCase):
                                    input_name="image", output_data=["t2", "vs"], output_name=["t2", "mask"],
                                    batch_size=4, shuffle=True, p_augm=0.0)
         train_set.reduce_to_nonzero_segm("vs")
-        self.assertEqual(377, len(train_set))
+        self.assertEqual(419, len(train_set))
 
     def test_single_result(self):
         train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data="t1",
@@ -411,7 +517,7 @@ class TestDataSet2DMixed(TestCase):
         np.random.seed(1335)
         train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data="t2",
                                    input_name="image", output_data=["t1", "vs"], output_name=["output", "mask"],
-                                   batch_size=16, shuffle=True, p_augm=0.5)
+                                   batch_size=16, shuffle=True, p_augm=0.5, paired=False)
         train_set.reduce_to_nonzero_segm("vs")
         train_set.plot_random_images(2, 2)
 
@@ -420,7 +526,7 @@ class TestDataSet2DMixed(TestCase):
         np.random.seed(1335)
         train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data="t2",
                                    input_name="image", output_data=["t1", "vs", "vs_class"],
-                                   output_name=["output", "mask", "class1"],
+                                   output_name=["output", "mask", "class1"], paired=False,
                                    batch_size=16, shuffle=False, p_augm=0.5)
         train_set.plot_random_images(2, 2)
 
@@ -428,18 +534,14 @@ class TestDataSet2DMixed(TestCase):
     def test_mockup_plot_paired(self):
         train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data="t1",
                                    input_name="image", output_data=["t2", "vs"], output_name=["output", "mask"],
-                                   batch_size=16, shuffle=True, p_augm=1.0)
+                                   batch_size=16, shuffle=True, p_augm=1.0, paired=True)
         train_set.reduce_to_nonzero_segm("vs")
-        train_set._unpaired = False
-        train_set.reset()
         train_set.plot_random_images(4, 4)
 
     @unittest.skip
     def test_mockup_plot_paired_class(self):
         train_set = DataSet2DMixed("../../data/VS_segm/VS_registered/training/", input_data="t1",
                                    input_name="image", output_data=["t2", "vs", "vs_class"],
-                                   output_name=["output", "mask", "class"],
+                                   output_name=["output", "mask", "class"], paired=True,
                                    batch_size=16, shuffle=True, p_augm=1.0)
-        train_set._unpaired = False
-        train_set.reset()
         train_set.plot_random_images(4, 4)

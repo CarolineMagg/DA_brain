@@ -18,7 +18,7 @@ def load_data_from_folder(data_folder, subfiles=None):
     """
 
     if subfiles is None:
-        subfiles = ["vs_gk_t1_refT2.nii", "vs_gk_t2_refT2.nii", "vs_gk_seg_refT2.nii"]
+        subfiles = ["vs_gk_t1_refT1.nii", "vs_gk_t2_refT1.nii", "vs_gk_seg_refT1.nii"]
 
     path = [os.path.join(data_folder, f) for f in subfiles]
     images = [nib.load(p) for p in path]
