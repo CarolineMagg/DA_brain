@@ -1,26 +1,17 @@
 ########################################################################################################################
-# Script to generate additional information about T1 slices that are empty
-# will generate a txt file in the dataset folder called "vs_gk_t1_info.txt" including the first non-empty slice index
+# Script to generate additional information about T1, T2 slices that are non-empty
+# will generate a txt file in the dataset folder containing statistical values.
 ########################################################################################################################
 
-import logging
 import os
-import cv2
-import numpy as np
-
-from data_utils.DataContainer import DataContainer
-from data_utils.DataSet2D import DataSet2D
-
-########################################################################################################################
-# DataContainer to load nifti files in patient data folder
-########################################################################################################################
-
 import numpy as np
 import os.path
 import nibabel as nib
 import json
 
 __author__ = "c.magg"
+
+from natsort import natsorted
 
 
 class DataContainer:
@@ -38,13 +29,12 @@ class DataContainer:
         """
         self._path_dir = dir_path
         files = os.listdir(dir_path)
-        self._path_t1 = os.path.join(dir_path, "vs_gk_t1_refT2.nii")
-        self._path_t2 = os.path.join(dir_path, "vs_gk_t2_refT2.nii")
+        self._path_t1 = os.path.join(dir_path, "vs_gk_t1_refT1.nii")
+        self._path_t2 = os.path.join(dir_path, "vs_gk_t2_refT1.nii")
         self._path_vs = os.path.join(dir_path, [f for f in files if "vs_gk_struc1" in f][0])
         self._path_cochlea = None
         if len([f for f in files if "vs_gk_struc2" in f]) != 0:
             self._path_cochlea = os.path.join(dir_path, [f for f in files if "vs_gk_struc2" in f][0])
-        self._path_data_info = os.path.join(dir_path, "vs_gk_t1_info.txt")
         self._data_t1 = None
         self._data_t2 = None
         self._data_vs = None
@@ -121,22 +111,20 @@ if __name__ == "__main__":
     paths = ["/tf/workdir/data/VS_segm/VS_registered/training/",
              "/tf/workdir/data/VS_segm/VS_registered/validation/",
              "/tf/workdir/data/VS_segm/VS_registered/test/"]
-    batch_sizes = [10450 // 50, 2960 // 16, 3960 // 30]
 
     # extract statistics
+    print("Extract statistics.")
     for path in paths:
-        folders = [os.path.join(path, p) for p in os.listdir(path)]
+        folders = natsorted([os.path.join(path, p) for p in os.listdir(path)])
         for folder in folders:
+            print(folder)
+            # if "125" not in folder:
+            #     continue
             statistics = {}
             fn = os.path.join(folder, "vs_gk_statistics.json")
             container = DataContainer(folder)
             ## t1 ##
             sample = container.t1_scan
-            # remove empty slices
-            sums = [np.sum(sample[:, :, idx]) for idx in range(np.shape(sample)[-1])]
-            empty_slices = [idx for idx, s in enumerate(sums) if s == 0]
-            first_nonemtpy_slice = empty_slices[-1] + 1 if len(empty_slices) != 0 else 0
-            sample = sample[:, :, first_nonemtpy_slice:]
             # percentile
             percentile1 = np.percentile(sample, 1)
             percentile99 = np.percentile(sample, 99)
@@ -149,8 +137,7 @@ if __name__ == "__main__":
             min = sample.min()
             max = sample.max()
             sample = (sample - min) / (max - min)
-            statistics["t1"] = {"first_nonempty_slice": str(first_nonemtpy_slice),
-                                "1st_percentile": str(percentile1),
+            statistics["t1"] = {"1st_percentile": str(percentile1),
                                 "99th_percentile": str(percentile99),
                                 "mean": str(mean),
                                 "std": str(std),
@@ -158,12 +145,7 @@ if __name__ == "__main__":
                                 "max": str(max)}
 
             ## t2 ##
-            sample = container.t1_scan
-            # remove empty slices
-            sums = [np.sum(sample[:, :, idx]) for idx in range(np.shape(sample)[-1])]
-            empty_slices = np.where(sums == 0)[0]
-            first_nonemtpy_slice = empty_slices[-1] + 1 if len(empty_slices) != 0 else 0
-            sample = sample[:, :, first_nonemtpy_slice:]
+            sample = container.t2_scan
             # percentile
             percentile1 = np.percentile(sample, 1)
             percentile99 = np.percentile(sample, 99)
@@ -176,12 +158,24 @@ if __name__ == "__main__":
             min = sample.min()
             max = sample.max()
             sample = (sample - min) / (max - min)
-            statistics["t2"] = {"first_nonempty_slice": str(first_nonemtpy_slice),
-                                "1st_percentile": str(percentile1),
+            statistics["t2"] = {"1st_percentile": str(percentile1),
                                 "99th_percentile": str(percentile99),
                                 "mean": str(mean),
                                 "std": str(std),
                                 "min": str(min),
                                 "max": str(max)}
+            # write file
             with open(fn, 'w') as outfile:
                 json.dump(statistics, outfile)
+
+    # count how many folders do not have cochlea segmentation
+    print("Count folders without cochlea segmentation.")
+    non_cochlea = 0
+    for path in paths:
+        folders = [os.path.join(path, p) for p in os.listdir(path)]
+        for folder in folders:
+            files = os.listdir(folder)
+            present = [True for f in files if "vs_gk_struc2" in f]
+            if len(present) == 0:
+                non_cochlea += 1
+    print("Non-cochlea folders: ", non_cochlea)
