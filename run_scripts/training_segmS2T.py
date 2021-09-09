@@ -29,6 +29,8 @@ parser.add_argument('--model_type', dest='model_type', default="XNet", type=str,
                     help='segmentation network architecture')
 parser.add_argument('--activation', dest='activation', default="relu", type=str,
                     help='activation function')
+parser.add_argument('--cycle_gan', dest='cycle_gan', default="gan_10_100_50_13785", type=str,
+                    help='cycle gan identifier')
 
 args = parser.parse_args()
 
@@ -45,17 +47,19 @@ if __name__ == "__main__":
     data_nr = args.data_nr if args.data_nr != 0 else None
     step_decay = args.step_decay if args.step_decay != 0 else None
 
-    identifier = f"segmS2T_{model_type}_{epochs}_{step_decay}_{seed}"
+    identifier = f"segmS2T_{model_type}_{epochs}_{step_decay}_{seed}_4"
     tensorboard_dir = f"/tf/workdir/DA_brain/logs/{identifier}/"
     checkpoints_dir = f"/tf/workdir/DA_brain/saved_models/{identifier}/checkpoints/"
     save_model_dir = f"/tf/workdir/DA_brain/saved_models/{identifier}/"
     sample_dir = f"/tf/workdir/DA_brain/saved_models/{identifier}/sample_dir/"
     data_dir = "/tf/workdir/data/VS_segm/VS_registered/"
+    cycle_gan_dir = args.cycle_gan
     cyle_gan_segm = SegmS2T(data_dir=data_dir,
                             tensorboard_dir=tensorboard_dir,
                             checkpoints_dir=checkpoints_dir,
                             save_model_dir=save_model_dir,
                             sample_dir=sample_dir,
+                            cycle_gan_dir=cycle_gan_dir,
                             seed=seed,
                             batch_size=batch_size,
                             model_type=model_type,

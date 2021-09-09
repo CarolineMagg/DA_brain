@@ -99,14 +99,12 @@ class CycleGAN:
         logging.info("CycleGAN: loading data ...")
         self.train_set = DataSet2DMixed(os.path.join(self.dir_data, "training"), input_data=["t1"],
                                         input_name=["image"], output_data="t2", output_name="generated_t2",
-                                        batch_size=1, shuffle=True, p_augm=0.0, alpha=-1, beta=1, use_filter="vs",
+                                        batch_size=1, shuffle=True, p_augm=0.0, alpha=-1, beta=1, segm_size=0,
                                         dsize=self.dsize)
         self.val_set = DataSet2DMixed(os.path.join(self.dir_data, "validation"), input_data=["t1"],
                                       input_name=["image"], output_data="t2", output_name="generated_t2",
-                                      batch_size=1, shuffle=False, p_augm=0.0, alpha=-1, beta=1, use_filter="vs",
-                                      dsize=self.dsize)
-        self.val_set._unpaired = False
-        self.val_set.reset()
+                                      batch_size=1, shuffle=False, p_augm=0.0, alpha=-1, beta=1, segm_size=0,
+                                      dsize=self.dsize, paired=True)
         logging.info("CycleGAN: training {0}, validation {1}".format(len(self.train_set), len(self.val_set)))
 
     @tf.function
@@ -259,7 +257,7 @@ class CycleGAN:
             try:  # restore checkpoint including the epoch counter
                 self.checkpoint.restore().assert_existing_objects_matched()
             except Exception as e:
-                print("CycleGAN: " + e)
+                print("CycleGAN: " + str(e))
 
     @staticmethod
     def _collect_losses(G_loss_dict, D_loss_dict, G_loss_dict_list, D_loss_dict_list):

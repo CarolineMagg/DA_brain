@@ -24,7 +24,8 @@ __author__ = "c.magg"
 
 class SegmS2T:
 
-    def __init__(self, data_dir, tensorboard_dir, checkpoints_dir, save_model_dir, sample_dir,
+    def __init__(self, data_dir, tensorboard_dir, checkpoints_dir, save_model_dir,
+                 sample_dir, cycle_gan_dir,
                  seed=13375, sample_step=500, activation="relu",
                  dsize=(256, 256), batch_size=1, model_type="XNet"):
         """
@@ -57,7 +58,8 @@ class SegmS2T:
         self._load_data()
 
         # generator
-        self.G_S2T = tf.keras.models.load_model("/tf/workdir/DA_brain/saved_models/gan_10_100_50_13785/G_S2T")
+        self.G_S2T = tf.keras.models.load_model(
+            os.path.join("/tf/workdir/DA_brain/saved_models", cycle_gan_dir, "G_S2T"))
 
         # segmentation network
         if model_type == "XNet":
@@ -105,16 +107,14 @@ class SegmS2T:
                                         input_name=["image"], output_data=["t2", "vs"],
                                         output_name=["t2", "vs"],
                                         batch_size=self.batch_size, shuffle=True, p_augm=0.0,
-                                        alpha=-1, beta=1, use_filter="vs",
+                                        alpha=-1, beta=1, segm_size=0,
                                         dsize=self.dsize)
         self.val_set = DataSet2DMixed(os.path.join(self.dir_data, "validation"), input_data=["t1"],
                                       input_name=["image"], output_data=["t2", "vs"],
                                       output_name=["t2", "vs"],
                                       batch_size=1, shuffle=False, p_augm=0.0,
-                                      alpha=-1, beta=1, use_filter="vs",
+                                      alpha=-1, beta=1, segm_size=0, paired=True,
                                       dsize=self.dsize)
-        self.val_set._unpaired = False
-        self.val_set.reset()
         logging.info("SegmS2T: training {0}, validation {1}".format(len(self.train_set), len(self.val_set)))
 
     @tf.function
@@ -162,7 +162,7 @@ class SegmS2T:
             try:  # restore checkpoint including the epoch counter
                 self.checkpoint.restore().assert_existing_objects_matched()
             except Exception as e:
-                print("SegmS2T: " + e)
+                print("SegmS2T: " + str(e))
 
     @staticmethod
     def _collect_losses(S_loss_dict, S_loss_dict_list):

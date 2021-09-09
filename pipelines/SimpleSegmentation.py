@@ -85,7 +85,7 @@ class SimpleSegmentation:
             self.train_set = DataSet2DMixed("/tf/workdir/data/VS_segm/VS_registered/training/",
                                             input_data=["t1"], input_name=["image"],
                                             output_data="vs", output_name="vs",
-                                            batch_size=self.batch_size, shuffle=True, use_filter="vs",
+                                            batch_size=self.batch_size, shuffle=True, segm_size=0,
                                             dsize=self.dsize, p_augm=0.0, alpha=0, beta=1)
             self.train_set.augm_methods = [
                 A.ShiftScaleRotate(p=0.5, rotate_limit=15, border_mode=cv2.BORDER_CONSTANT),
@@ -97,14 +97,14 @@ class SimpleSegmentation:
             self.val_set = DataSet2DMixed("/tf/workdir/data/VS_segm/VS_registered/validation/",
                                           input_data=["t1"], input_name=["image"],
                                           output_data="vs", output_name="vs", batch_size=self.batch_size, shuffle=True,
-                                          use_filter="vs", dsize=self.dsize, p_augm=0.0, alpha=0, beta=1)
+                                          segm_size=0, dsize=self.dsize, p_augm=0.0, alpha=0, beta=1)
 
         elif self.data_type == "t2":
             logging.info("SimpleSegmentation: Training vs with t2.")
             self.train_set = DataSet2DMixed("/tf/workdir/data/VS_segm/VS_registered/training/",
                                             input_data=["t2"], input_name=["image"],
                                             output_data="vs", output_name="vs",
-                                            batch_size=self.batch_size, shuffle=True, use_filter="vs",
+                                            batch_size=self.batch_size, shuffle=True, segm_size=0,
                                             dsize=self.dsize, p_augm=0.0, alpha=0, beta=1)
             self.train_set.augm_methods = [
                 A.ShiftScaleRotate(p=0.5, rotate_limit=15, border_mode=cv2.BORDER_CONSTANT),
@@ -116,7 +116,7 @@ class SimpleSegmentation:
             self.val_set = DataSet2DMixed("/tf/workdir/data/VS_segm/VS_registered/validation/",
                                           input_data=["t2"], input_name=["image"],
                                           output_data="vs", output_name="vs",
-                                          batch_size=self.batch_size, shuffle=True, use_filter="vs", dsize=self.dsize,
+                                          batch_size=self.batch_size, shuffle=True, segm_size=0, dsize=self.dsize,
                                           p_augm=0.0, alpha=0, beta=1)
 
         elif self.data_type == "t1_t2":
@@ -126,7 +126,7 @@ class SimpleSegmentation:
             self.train_set = DataSet2DMixed("/tf/workdir/data/VS_segm/VS_registered/training/",
                                             input_data=["t1", "t2"], input_name=["image", "t2"],
                                             output_data="vs", output_name="vs",
-                                            batch_size=self.batch_size, shuffle=True, use_filter="vs",
+                                            batch_size=self.batch_size, shuffle=True, segm_size=0,
                                             dsize=self.dsize, p_augm=0.0, alpha=0, beta=1)
             self.train_set.augm_methods = [
                 A.ShiftScaleRotate(p=0.5, rotate_limit=15, border_mode=cv2.BORDER_CONSTANT),
@@ -138,8 +138,8 @@ class SimpleSegmentation:
             self.val_set = DataSet2DMixed("/tf/workdir/data/VS_segm/VS_registered/validation/",
                                           input_data=["t1", "t2"], input_name=["image", "t2"],
                                           output_data="vs", output_name="vs",
-                                          batch_size=self.batch_size, shuffle=True, use_filter="vs", dsize=self.dsize,
-                                          p_augm=0.0, alpha=0, beta=1)
+                                          batch_size=self.batch_size, shuffle=True, segm_size=0,
+                                          dsize=self.dsize, p_augm=0.0, alpha=0, beta=1)
 
         else:
             raise ValueError(f"Training {self.data_type} not valid.")
