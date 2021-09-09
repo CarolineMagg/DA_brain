@@ -110,8 +110,10 @@ class InferenceSimpleSegmentation:
         inputs = [images[k[0]] for k in dice_top]
         targets = [segm_gt[k[0]] for k in dice_top]
         pred = [segm_pred[k[0]] for k in dice_top]
+        sz = [np.sum(s) for s in targets]
+        sz_pred = [np.sum(s) for s in pred]
         assd_top = [assd[k[0]] for k in dice_top]
-        print(f"best {k} dice: {dice_top} \nwith assd: {assd_top}")
+        print(f"best {k} dice: {dice_top} \nwith assd: {assd_top} \nwith original sz: {sz} \nwith pred sz: {sz_pred}")
         if plot:
             plot_predictions_overlap(inputs, targets, pred)
 
@@ -120,7 +122,9 @@ class InferenceSimpleSegmentation:
         inputs = [images[k[0]] for k in dice_bottom]
         targets = [segm_gt[k[0]] for k in dice_bottom]
         pred = [segm_pred[k[0]] for k in dice_bottom]
+        sz = [np.sum(s) for s in targets]
+        sz_pred = [np.sum(s) for s in pred]
         assd_bottom = [assd[k[0]] for k in dice_bottom]
-        print(f"worst {k} dice: {dice_bottom} \nwith assd: {assd_bottom}")
+        print(f"worst {k} dice: {dice_bottom} \nwith assd: {assd_bottom} \nwith original sz: {sz} \nwith pred sz: {sz_pred}")
         if plot:
             plot_predictions_overlap(inputs, targets, pred)
