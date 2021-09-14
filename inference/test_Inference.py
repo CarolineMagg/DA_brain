@@ -30,7 +30,7 @@ class TestInferenceSimpleSegmentation(TestCase):
 
     def test_get_k_results(self):
         inf = InferenceSimpleSegmentation("/tf/workdir/DA_brain/saved_models/XNet_t1_relu_segm_13318", self.data)
-        inf.get_k_results(plot=False)
+        inf.get_k_results(do_plot=False)
 
     def test_evaluate(self):
         inf = InferenceSimpleSegmentation("/tf/workdir/DA_brain/saved_models/XNet_t1_relu_segm_13318", self.data)
@@ -52,9 +52,9 @@ class TestInferenceGT2SSegmS(TestCase):
         check_gpu()
 
     def test_infer(self):
-        inf = InferenceGT2SSegmS("/tf/workdir/DA_brain/saved_models/gan_10_100_50_13785/G_T2S",
+        inf = InferenceGT2SSegmS("/tf/workdir/DA_brain/saved_models/gan_2_100_50_13785/G_T2S",
                                  "/tf/workdir/DA_brain/saved_models/XNet_t1_relu_segm_13318",
-                                 "/tf/workdir/DA_brain/saved_models/gan_10_100_50_13785/D_S",
+                                 "/tf/workdir/DA_brain/saved_models/gan_2_100_50_13785/D_S",
                                  self.data)
         self.data.batch_size = 4
         S_gen, segm_pred, a, b = inf.infer(self.data[0][0]["generated_t2"])
@@ -64,15 +64,15 @@ class TestInferenceGT2SSegmS(TestCase):
         self.assertEqual(None, b)
 
     def test_evaluate(self):
-        inf = InferenceGT2SSegmS("/tf/workdir/DA_brain/saved_models/gan_10_100_50_13785/G_T2S",
+        inf = InferenceGT2SSegmS("/tf/workdir/DA_brain/saved_models/gan_2_100_50_13785/G_T2S",
                                  "/tf/workdir/DA_brain/saved_models/XNet_t1_relu_segm_13318",
-                                 "/tf/workdir/DA_brain/saved_models/gan_10_100_50_13785/D_S",
+                                 "/tf/workdir/DA_brain/saved_models/gan_2_100_50_13785/D_S",
                                  self.data)
         result = inf.evaluate()
 
     def test_get_k_result(self):
-        inf = InferenceGT2SSegmS("/tf/workdir/DA_brain/saved_models/gan_10_100_50_13785/G_T2S",
+        inf = InferenceGT2SSegmS("/tf/workdir/DA_brain/saved_models/gan_2_100_50_13785/G_T2S",
                                  "/tf/workdir/DA_brain/saved_models/XNet_t1_relu_segm_13318",
-                                 "/tf/workdir/DA_brain/saved_models/gan_10_100_50_13785/D_S",
+                                 "/tf/workdir/DA_brain/saved_models/gan_2_100_50_13785/D_S",
                                  self.data)
-        inf.get_k_results(plot=False)
+        inf.get_k_results(do_plot=False)

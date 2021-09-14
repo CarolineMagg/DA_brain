@@ -53,7 +53,7 @@ class InferenceSimpleSegmentation:
                 inputs = tf.expand_dims(tf.expand_dims(inputs, 0), -1)
         return self.model.predict(inputs)
 
-    def evaluate(self, opt_batch_size=5):
+    def evaluate(self, opt_batch_size=5, do_print=True):
         """
         Evaluate inference pipeline
         """
@@ -62,7 +62,8 @@ class InferenceSimpleSegmentation:
                   'dice_coeff_std': np.nanstd(dice),
                   'assd_mean': np.nanmean(assd),
                   'assd_std': np.nanstd(assd)}
-        print(result)
+        if do_print:
+            print(result)
         return result
 
     def _evaluate(self, opt_batch_size=5):
@@ -98,7 +99,7 @@ class InferenceSimpleSegmentation:
         self.data_gen.batch_size = self.data_gen._number_index
         return dc, assd, segm_pred, images, segm_gt
 
-    def get_k_results(self, k=4, plot=True):
+    def get_k_results(self, k=4, do_plot=True):
         """
         Get k best/worst results and statistic with mean, median, std, max, min value of Dice Coefficient.
         Optionally: plot the results of best/worst k results.
@@ -114,7 +115,7 @@ class InferenceSimpleSegmentation:
         sz_pred = [np.sum(s) for s in pred]
         assd_top = [assd[k[0]] for k in dice_top]
         print(f"best {k} dice: {dice_top} \nwith assd: {assd_top} \nwith original sz: {sz} \nwith pred sz: {sz_pred}")
-        if plot:
+        if do_plot:
             plot_predictions_overlap(inputs, targets, pred)
 
         # bottom k dice results
@@ -126,5 +127,5 @@ class InferenceSimpleSegmentation:
         sz_pred = [np.sum(s) for s in pred]
         assd_bottom = [assd[k[0]] for k in dice_bottom]
         print(f"worst {k} dice: {dice_bottom} \nwith assd: {assd_bottom} \nwith original sz: {sz} \nwith pred sz: {sz_pred}")
-        if plot:
+        if do_plot:
             plot_predictions_overlap(inputs, targets, pred)

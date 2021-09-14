@@ -62,7 +62,7 @@ class InferenceGT2SSegmS:
         segmentation = self.segmentor.predict((S_generated + 1) / 2)
         return S_generated, segmentation, S_d_gen, S_d_gt
 
-    def evaluate(self, opt_batch_size=5):
+    def evaluate(self, opt_batch_size=5, do_print=True):
         """
         Evaluate inference pipeline
         """
@@ -76,7 +76,8 @@ class InferenceGT2SSegmS:
                   'dice_coeff_std': np.nanstd(dice),
                   'assd_mean': np.nanmean(assd),
                   'assd_std': np.nanstd(assd)}
-        print(result)
+        if do_print:
+            print(result)
         return result
 
     def _evaluate(self, opt_batch_size=5):
@@ -117,7 +118,7 @@ class InferenceGT2SSegmS:
         self._data_gen.batch_size = self._data_gen._number_index
         return dc, assd, S_pred, segm_pred, S_pred_d, S_gt_d, S_inputs, T_inputs, segm_gt
 
-    def get_k_results(self, k=4, opt_batch_size=5, plot=True):
+    def get_k_results(self, k=4, opt_batch_size=5, do_plot=True):
         """
         Get k best/worst results wrt Dice Coefficient.
         Optionally: plot the results of best/worst k results.
@@ -134,7 +135,7 @@ class InferenceGT2SSegmS:
         pred = [segm_pred[k[0]] for k in dice_top]
         assd_top = [assd[k[0]] for k in dice_top]
         print(f"best {k} dice: {dice_top} \nwith assd: {assd_top}")
-        if plot:
+        if do_plot:
             plot_predictions_separate_overlap(inputs, targets_gen, inputs_gen, targets, pred)
 
         # bottom k dice results
@@ -146,5 +147,5 @@ class InferenceGT2SSegmS:
         pred = [segm_pred[k[0]] for k in dice_bottom]
         assd_bottom = [assd[k[0]] for k in dice_top]
         print(f"worst {k} dice: {dice_bottom} \nwith assd: {assd_bottom}")
-        if plot:
+        if do_plot:
             plot_predictions_separate_overlap(inputs, targets_gen, inputs_gen, targets, pred)
