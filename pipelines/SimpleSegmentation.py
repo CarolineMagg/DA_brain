@@ -64,10 +64,13 @@ class SimpleSegmentation:
                                                      mode='min')
         checkpoint = tf.keras.callbacks.ModelCheckpoint(self.dir_checkpoint, monitor="val_loss", verbose=1,
                                                         save_best_only=True, save_weights_only=False)
+        reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=10, min_lr=0.0001,
+                                                         verbose=1)
         tensorboard = tf.keras.callbacks.TensorBoard(log_dir=self.dir_tb)
 
         self.callbacks = [earlystop,
                           checkpoint,
+                          reduce_lr,
                           tensorboard]
 
     def _load_data(self):
