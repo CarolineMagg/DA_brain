@@ -54,7 +54,6 @@ class SegmS2T:
         # data
         self.train_set = None
         self.val_set = None
-        self.test_set = None
         self._load_data()
 
         # generator
@@ -76,12 +75,6 @@ class SegmS2T:
         # optimizer
         self.optimizer = None
         self._set_optimizer()
-
-        # fake image history
-        self._pool_size = 50
-        self._fake_S = np.zeros((self._pool_size, 1, 256, 256, 1))
-        self._fake_T = np.zeros((self._pool_size, 1, 256, 256, 1))
-        self._num_fake = 0
 
         # checkpoints and template
         self.template = "{2}/{3} in {4:.4f} sec - Dice_loss: {0:.5f} - Dice_Coeff: {1:.5f}"

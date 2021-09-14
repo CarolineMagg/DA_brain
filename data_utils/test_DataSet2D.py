@@ -4,6 +4,8 @@ from unittest import TestCase
 import numpy as np
 import logging
 
+from data_utils.DataSet2DSynthetic import DataSet2DSynthetic
+
 logging.basicConfig(level=logging.DEBUG)
 
 from data_utils.DataSet2D import DataSet2D
@@ -544,4 +546,83 @@ class TestDataSet2DMixed(TestCase):
                                    input_name="image", output_data=["t2", "vs", "vs_class"],
                                    output_name=["output", "mask", "class"], paired=True,
                                    batch_size=16, shuffle=True, p_augm=1.0)
+        train_set.plot_random_images(4, 4)
+
+
+class TestDataSet2DSynthetic(TestCase):
+
+    def test_init(self):
+        train_set = DataSet2DSynthetic("../../data/VS_segm/VS_registered/training/",
+                                       cycle_gan="gan_2_100_50_13785/G_S2T",
+                                       input_data=["t1"], input_name=["image"],
+                                       output_data=["vs", "vs_class"], output_name=["mask", "class1"],
+                                       batch_size=4, shuffle=True)
+        self.assertEqual(4, train_set.batch_size)
+        self.assertEqual(0.0, train_set.p_augm)
+        self.assertEqual((256, 256), train_set.dsize)
+        self.assertEqual(True, train_set.shuffle)
+        self.assertEqual(10400, len(train_set))
+        self.assertListEqual(["image"], train_set._input_name)
+        self.assertListEqual(["mask", "class1"], train_set._output_name)
+        self.assertListEqual(["t1"], train_set._input_data)
+        self.assertListEqual(["vs", "vs_class"], train_set._output_data)
+
+        train_set = DataSet2DSynthetic("../../data/VS_segm/VS_registered/training/",
+                                       cycle_gan="gan_2_100_50_13785/G_S2T",
+                                       input_data=["t1"], input_name=["image"],
+                                       output_data=["vs", "vs_class"], output_name=["mask", "class1"],
+                                       batch_size=1, shuffle=True)
+        self.assertEqual(1, train_set.batch_size)
+        self.assertEqual(0.5, train_set.p_augm)
+        self.assertEqual((256, 256), train_set.dsize)
+        self.assertEqual(False, train_set.shuffle)
+        self.assertEqual(2600, len(train_set))
+        self.assertEqual(10400, train_set._number_index)
+        self.assertListEqual(["image"], train_set._input_name)
+        self.assertListEqual(["cochlea_"], train_set._output_name)
+        self.assertListEqual(["t1"], train_set._input_data)
+        self.assertListEqual(["cochlea"], train_set._output_data)
+
+    def test_range(self):
+        np.random.seed(5)
+        train_set = DataSet2DSynthetic("../../data/VS_segm/VS_registered/training/",
+                                       cycle_gan="gan_2_100_50_13785/G_S2T",
+                                       input_data=["t1"], input_name=["image"],
+                                       output_data=["vs", "vs_class"], output_name=["mask", "class1"],
+                                       batch_size=1, shuffle=True,
+                                       alpha=0, beta=255)
+        result = train_set[1]
+        self.assertTrue(255 >= np.min(result[0]["image"]) >= 0)
+        self.assertTrue(255 >= np.max(result[0]["image"]) >= 0)
+
+        np.random.seed(5)
+        train_set = DataSet2DSynthetic("../../data/VS_segm/VS_registered/training/",
+                                       cycle_gan="gan_2_100_50_13785/G_S2T",
+                                       input_data=["t1"], input_name=["image"],
+                                       output_data=["vs", "vs_class"], output_name=["mask", "class1"],
+                                       batch_size=1, shuffle=True,
+                                       alpha=-1, beta=1)
+        result = train_set[1]
+        self.assertTrue(1 >= np.min(result[0]["image"]) >= -1)
+        self.assertTrue(1 >= np.max(result[0]["image"]) >= -1)
+
+        np.random.seed(5)
+        train_set = DataSet2DSynthetic("../../data/VS_segm/VS_registered/training/",
+                                       cycle_gan="gan_2_100_50_13785/G_S2T",
+                                       input_data=["t1"], input_name=["image"],
+                                       output_data=["vs", "vs_class"], output_name=["mask", "class1"],
+                                       batch_size=1, shuffle=True,
+                                       alpha=0, beta=1)
+        result = train_set[1]
+        self.assertTrue(1 >= np.min(result[0]["image"]) >= 0)
+        self.assertTrue(1 >= np.max(result[0]["image"]) >= 0)
+
+    @unittest.skip
+    def test_mockup_plot_paired_class(self):
+        train_set = DataSet2DSynthetic("../../data/VS_segm/VS_registered/training/",
+                                       cycle_gan="gan_2_100_50_13785/G_S2T",
+                                       input_data=["t1"], input_name=["image"],
+                                       output_data=["vs", "vs_class"], output_name=["mask", "class1"],
+                                       batch_size=16, shuffle=True, p_augm=1.0,
+                                       alpha=0, beta=1)
         train_set.plot_random_images(4, 4)

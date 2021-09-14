@@ -7,7 +7,7 @@ logging.basicConfig(level=logging.INFO)
 parent = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, parent)
 
-from pipelines.SegmS2T import SegmS2T
+from pipelines.SegmS2T_v2 import SegmS2T
 from models.utils import check_gpu
 
 parser = argparse.ArgumentParser(description='Process SegmS2T pipeline parameters.')
@@ -47,7 +47,7 @@ if __name__ == "__main__":
     data_nr = args.data_nr if args.data_nr != 0 else None
     step_decay = args.step_decay if args.step_decay != 0 else None
 
-    identifier = f"segmS2T_{model_type}_{epochs}_{step_decay}_{seed}_4"
+    identifier = f"segmS2T_{model_type}_{epochs}_{step_decay}_{seed}"
     tensorboard_dir = f"/tf/workdir/DA_brain/logs/{identifier}/"
     checkpoints_dir = f"/tf/workdir/DA_brain/saved_models/{identifier}/checkpoints/"
     save_model_dir = f"/tf/workdir/DA_brain/saved_models/{identifier}/"
