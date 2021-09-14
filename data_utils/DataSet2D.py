@@ -111,7 +111,7 @@ class DataSet2D(tf.keras.utils.Sequence):
 
     @batch_size.setter
     def batch_size(self, to):
-        logging.info(f"DataSet2D: set 'batch_size' to {to}")
+        logging.debug(f"DataSet2D: set 'batch_size' to {to}")
         self._batch_size = to
 
     @property
@@ -120,7 +120,7 @@ class DataSet2D(tf.keras.utils.Sequence):
 
     @shuffle.setter
     def shuffle(self, to):
-        logging.info(f"DataSet2D: set 'shuffle' to {to}")
+        logging.debug(f"DataSet2D: set 'shuffle' to {to}")
         self._shuffle = to
 
     @property
@@ -129,7 +129,7 @@ class DataSet2D(tf.keras.utils.Sequence):
 
     @dsize.setter
     def dsize(self, to):
-        logging.info(f"DataSet2D: set 'dsize' to {to}")
+        logging.debug(f"DataSet2D: set 'dsize' to {to}")
         self._dsize = to
 
     @property
@@ -138,7 +138,7 @@ class DataSet2D(tf.keras.utils.Sequence):
 
     @alpha.setter
     def alpha(self, to):
-        logging.info(f"DataSet2D: set 'alpha' to {to}")
+        logging.debug(f"DataSet2D: set 'alpha' to {to}")
         self._alpha = to
 
     @property
@@ -147,7 +147,7 @@ class DataSet2D(tf.keras.utils.Sequence):
 
     @beta.setter
     def beta(self, to):
-        logging.info(f"DataSet2D: set 'beta' to {to}")
+        logging.debug(f"DataSet2D: set 'beta' to {to}")
         self._beta = to
 
     @property
@@ -156,7 +156,7 @@ class DataSet2D(tf.keras.utils.Sequence):
 
     @p_augm.setter
     def p_augm(self, to):
-        logging.info(f"DataSet2D: set 'p_augm' to {to}")
+        logging.debug(f"DataSet2D: set 'p_augm' to {to}")
         self._p_augm = to
 
     @property
@@ -167,6 +167,17 @@ class DataSet2D(tf.keras.utils.Sequence):
     def augm_methods(self, to):
         assert type(to) == list, "'augm_methods' needs to be a list of albumentations methods"
         self._augm_methods = to
+
+    @property
+    def segm_size(self):
+        return self._segm_size
+
+    @segm_size.setter
+    def segm_size(self, to):
+        self._segm_size = to
+        self.reduce_greater_than_val_segm()
+        if self._balance:
+            self.balance_dataset()
 
     def __len__(self):
         return self._number_index // self.batch_size
