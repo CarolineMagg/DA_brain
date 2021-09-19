@@ -11,7 +11,7 @@ from models.utils import check_gpu
 parser = argparse.ArgumentParser(description='Process cycle gan pipeline parameters.')
 parser.add_argument('--seed', dest='seed', default=1334, type=int,
                     help='set seed for pipeline init')
-parser.add_argument('--sample_step', dest='sample_step', default=500, type=int,
+parser.add_argument('--sample_step', dest='sample_step', default=100, type=int,
                     help='sample generation step')
 parser.add_argument('--d_step', dest='d_step', default=1, type=int,
                     help='discriminator training steps')

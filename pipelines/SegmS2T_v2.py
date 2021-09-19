@@ -77,7 +77,8 @@ class SegmS2Tv2:
         self._set_optimizer()
 
         # checkpoints and template
-        self.template = "{4}/{5} in {6:.4f} sec - Dice_loss: {0:.5f} - Dice_Coeff: {1:.5f} - Dice_loss_val: {2:.5f} - Dice_Coeff_val: {3:.5f}"
+        self.template = "{2}/{3} in {4:.4f} sec - Dice_loss: {0:.5f} - Dice_Coeff: {1:.5f}"
+        self.template1 = "{4}/{5} in {6:.4f} sec - Dice_loss: {0:.5f} - Dice_Coeff: {1:.5f} - Dice_loss_val: {2:.5f} - Dice_Coeff_val: {3:.5f}"
         self.checkpoint = None
         self.train_summary_writer = None
 
@@ -112,7 +113,7 @@ class SegmS2Tv2:
         self.val_set = DataSet2DMixed(os.path.join(self.dir_data, "validation"), input_data=["t1"],
                                       input_name=["image"], output_data=["t2", "vs"],
                                       output_name=["t2", "vs"],
-                                      batch_size=1, shuffle=False, p_augm=0.0,
+                                      batch_size=1, shuffle=True, p_augm=0.0,
                                       alpha=-1, beta=1, segm_size=0, paired=True,
                                       dsize=self.dsize)
         logging.info("SegmS2T: training {0}, validation {1}".format(len(self.train_set), len(self.val_set)))
@@ -130,7 +131,7 @@ class SegmS2Tv2:
         S2T = self.G_S2T(S, training=False)
         with tf.GradientTape() as tape:
             # segmentation with synthetic T
-            pred = self.model((S2T+1)/2, training=True)
+            pred = self.model((S2T + 1) / 2, training=True)
 
             # loss and metrics
             dice_loss = DiceLoss()(S_mask, pred)
@@ -153,13 +154,12 @@ class SegmS2Tv2:
         """
         # generate synthetic T images
         S2T = self.G_S2T(S, training=False)
-        with tf.GradientTape() as tape:
-            # segmentation with synthetic T
-            pred = self.model((S2T+1)/2, training=False)
+        # segmentation with synthetic T
+        pred = self.model((S2T + 1) / 2, training=False)
 
-            # loss and metrics
-            dice_loss = DiceLoss()(S_mask, pred)
-            dice_coeff = DiceCoefficient()(S_mask, pred)
+        # loss and metrics
+        dice_loss = DiceLoss()(S_mask, pred)
+        dice_coeff = DiceCoefficient()(S_mask, pred)
 
         return {'dice_loss_val': dice_loss, 'dice_coeff_val': dice_coeff}
 
@@ -210,8 +210,8 @@ class SegmS2Tv2:
         Generate samples from current generators.
         """
         S2T = self.G_S2T(S, training=False)
-        T_segm = self.model((T+1)/2, training=False)
-        S2T_segm = self.model((S2T+1)/2, training=False)
+        T_segm = self.model((T + 1) / 2, training=False)
+        S2T_segm = self.model((S2T + 1) / 2, training=False)
         return S2T, S2T_segm, T_segm
 
     def train(self, epochs=50, data_nr=None, restore=True, step_decay=None):
@@ -221,13 +221,18 @@ class SegmS2Tv2:
         2) initialize tensorboard file writer and checkpoints
         3) initialize optimizer with LR scheduler
         4) for each epoch:
-            for each step:
+            for each sample in training set:
                 draw next batch from training data
                 perform training step
                 collect the losses
-                if sample generation step: generate sample
+            for each sample in val set:
+                draw next batch from training data
+                perform val step
+                collect the losses
+                optional: plot example
             write tensorboard summary
             save checkpoint
+            check val loss and update learning rate if necessary
         5) save model
         """
         logging.info("SegmS2T: set up training.")
@@ -247,6 +252,8 @@ class SegmS2Tv2:
         for epoch in range(epochs + 1):
             total_time_per_epoch = 0
             print("Epoch {0}/{1}".format(epoch, epochs))
+
+            # training steps
             for idx in range(data_nr):
                 # load data
                 S, T_ = self.train_set[idx]
@@ -257,40 +264,44 @@ class SegmS2Tv2:
                 S_loss_dict = self.train_step(S, S_mask)
                 elapsed = time() - start
                 total_time_per_epoch += elapsed
-                # val step
+                print(self.template.format(S_loss_dict["dice_loss"],
+                                           S_loss_dict["dice_coeff"],
+                                           idx, data_nr - 1,
+                                           total_time_per_epoch),
+                      end="\r")
+                # collect losses
+                S_loss_dict_list = self._collect_losses(S_loss_dict, S_loss_dict_list)
+            self.train_set.reset()
+
+            # validation steps
+            for idx in range(len(self.val_set)):
+                # load data
                 S_val_, T_val_ = self.val_set[sample_counter]
                 S_val = S_val_["image"]
                 S_mask_val = T_val_["vs"]
                 S_loss_dict_val = self.val_step(S_val, S_mask_val)
-                print(self.template.format(S_loss_dict["dice_loss"],
-                                           S_loss_dict["dice_coeff"],
-                                           S_loss_dict_val["dice_loss_val"],
+
+                print(self.template.format(S_loss_dict_val["dice_loss_val"],
                                            S_loss_dict_val["dice_coeff_val"],
                                            idx, data_nr - 1,
                                            total_time_per_epoch),
                       end="\r")
-                self.train_set.reset()
-                self.val_set.reset()
                 # collect losses
-                S_loss_dict_list = self._collect_losses(S_loss_dict, S_loss_dict_list)
                 S_loss_dict_list_val = self._collect_losses(S_loss_dict_val, S_loss_dict_list_val)
+
                 # sample
                 if idx % self.sample_step == 0:
-                    A = S_val_["image"]
-                    B = T_val_["t2"]
-                    A_mask = T_val_["vs"]
-                    B_mask = T_val_["vs_2"]
-                    S2T, S2T_segm, T_segm = self.sample(A, B)
+                    T_val = T_val_["t2"]
+                    T_mask_val = T_val_["vs_2"]
+                    S2T, S2T_segm, T_segm = self.sample(S_val, T_val)
                     img = np.hstack(
                         np.concatenate(
-                            [tf.expand_dims(A, -1), tf.expand_dims(A + A_mask * 2, -1), S2T + S2T_segm * 2,
-                             tf.expand_dims(B, -1), tf.expand_dims(B + B_mask * 2, -1),
-                             tf.expand_dims(B, -1) + T_segm * 2], axis=0))
+                            [tf.expand_dims(S_val, -1), tf.expand_dims(S_val + S_mask_val * 2, -1), S2T + S2T_segm * 2,
+                             tf.expand_dims(T_val, -1), tf.expand_dims(T_val + T_mask_val * 2, -1),
+                             tf.expand_dims(T_val, -1) + T_segm * 2], axis=0))
                     img = cv2.normalize(img, img, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
                     cv2.imwrite(os.path.join(self.dir_sample, 'iter-%03d-%05d.jpg' % (epoch, idx)), img)
-                    sample_counter = sample_counter + 1
-                    if sample_counter >= len(self.val_set):
-                        sample_counter = 0
+            self.val_set.reset()
 
             # tensorboard summary
             with self.train_summary_writer.as_default():
@@ -301,11 +312,11 @@ class SegmS2Tv2:
                 tf.summary.scalar("learning_rate",
                                   self.optimizer.learning_rate.current_learning_rate,
                                   step=epoch)
-            print(self.template.format(np.mean(S_loss_dict_list["dice_loss"]),
-                                       np.mean(S_loss_dict_list["dice_coeff"]),
-                                       np.mean(S_loss_dict_list_val["dice_loss_val"]),
-                                       np.mean(S_loss_dict_list_val["dice_coeff_val"]),
-                                       data_nr - 1, data_nr - 1, total_time_per_epoch))
+            print(self.template1.format(np.mean(S_loss_dict_list["dice_loss"]),
+                                        np.mean(S_loss_dict_list["dice_coeff"]),
+                                        np.mean(S_loss_dict_list_val["dice_loss_val"]),
+                                        np.mean(S_loss_dict_list_val["dice_coeff_val"]),
+                                        data_nr - 1, data_nr - 1, total_time_per_epoch))
 
             # save checkpoint
             logging.debug(f"Write checkpoints {self.dir_cktp}.")
@@ -322,9 +333,10 @@ class SegmS2Tv2:
                     lr = self.optimizer.learning_rate.current_learning_rate
                     if lr * self._lr_factor >= self._lr_min:
                         self._patience_counter = 0
-                        logging.info(f"Reduce LR to {lr * 0.1}.")
+                        print(f"Reduce LR to {lr * self._lr_factor}.")
                         self.optimizer.learning_rate.current_learning_rate = lr * self._lr_factor
                     else:
+                        self.optimizer.learning_rate.current_learning_rate = self._lr_min
                         self._patience = np.inf
         # save model
         self._save_models()

@@ -13,11 +13,11 @@ from models.utils import check_gpu
 parser = argparse.ArgumentParser(description='Process SegmS2T pipeline parameters.')
 parser.add_argument('--seed', dest='seed', default=1334, type=int,
                     help='set seed for pipeline init')
-parser.add_argument('--sample_step', dest='sample_step', default=1000, type=int,
+parser.add_argument('--sample_step', dest='sample_step', default=100, type=int,
                     help='sample generation step')
 parser.add_argument('--dsize', dest='dsize', default=(256, 256), type=tuple,
                     help='image size')
-parser.add_argument('--epochs', dest='epochs', default=50, type=int,
+parser.add_argument('--epochs', dest='epochs', default=100, type=int,
                     help='number of epochs')
 parser.add_argument('--data_nr', dest='data_nr', default=0, type=int,
                     help='number of images per epoch/number of steps per epoch')

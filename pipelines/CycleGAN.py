@@ -351,13 +351,15 @@ class CycleGAN:
                                            idx, data_nr - 1,
                                            total_time_per_epoch),
                       end="\r")
-                self.train_set.reset()
                 # collect losses
                 G_loss_dict_list, D_loss_dict_list = self._collect_losses(G_loss_dict, D_loss_dict, G_loss_dict_list,
                                                                           D_loss_dict_list)
+            self.train_set.reset()
+
+            for idx in range(len(self.val_set)):
                 # sample
                 if idx % self.sample_step == 0:
-                    A, B = self.val_set[sample_counter]
+                    A, B = self.val_set[idx]
                     A = A["image"]
                     B = B["generated_t2"]
                     A2B, B2A, A2B2A, B2A2B = self.sample(A, B)
@@ -366,9 +368,8 @@ class CycleGAN:
                     img = cv2.normalize(img, img, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
                     cv2.imwrite(os.path.join(self.dir_sample, 'iter-%03d-%05d.jpg' % (epoch, idx)),
                                 img)
-                    sample_counter = sample_counter + 1
-                    if sample_counter >= len(self.val_set):
-                        sample_counter = 0
+            self.val_set.reset()
+
 
             # tensorboard summary
             with self.train_summary_writer.as_default():
