@@ -266,8 +266,11 @@ class DataSet2D(tf.keras.utils.Sequence):
         """
         image_keys = [k for k, v in self.lookup_data_augmentation().items() if v == 'image']
         for k in image_keys:
-            data[k] = ((data[k] - np.min(data[k])) / (np.max(data[k]) - np.min(data[k]))) * (
-                    self.beta - self.alpha) + self.alpha
+            if np.max(data[k]) - np.min(data[k]) == 0:
+                data[k] = data[k]
+            else:
+                data[k] = ((data[k] - np.min(data[k])) / (np.max(data[k]) - np.min(data[k]))) * (
+                        self.beta - self.alpha) + self.alpha
         return data
 
     def _load_data(self):
