@@ -2,6 +2,7 @@ from unittest import TestCase
 import numpy as np
 
 from data_utils.DataSet2DMixed import DataSet2DMixed
+from inference.InferenceCGSegmentation import InferenceCGSegmentation
 from inference.InferenceGT2SSegmS import InferenceGT2SSegmS
 from inference.InferenceSimpleSegmentation import InferenceSimpleSegmentation
 from models.utils import check_gpu
@@ -37,7 +38,8 @@ class TestInferenceSimpleSegmentation(TestCase):
         res = inf.evaluate()
 
     def test_evaluate_multi(self):
-        inf = InferenceSimpleSegmentation("/tf/workdir/DA_brain/saved_models/XNet_t1_t2_relu_segm_13318", self.data_multi)
+        inf = InferenceSimpleSegmentation("/tf/workdir/DA_brain/saved_models/XNet_t1_t2_relu_segm_13318",
+                                          self.data_multi)
         res = inf.evaluate()
 
 
@@ -76,3 +78,19 @@ class TestInferenceGT2SSegmS(TestCase):
                                  "/tf/workdir/DA_brain/saved_models/gan_2_100_50_13785/D_S",
                                  self.data)
         inf.get_k_results(do_plot=False)
+
+
+class TestInferenceCGSegm(TestCase):
+
+    def setUp(self) -> None:
+        self.data = DataSet2DMixed("/tf/workdir/data/VS_segm/VS_registered/validation",
+                                   input_data=["t1"], input_name=["image"],
+                                   output_data=["vs", "vs_class"], output_name=["vs", "vs_class"],
+                                   segm_size=0, batch_size=1, shuffle=False, p_augm=0.0, dsize=(256, 256),
+                                   alpha=-1, beta=1)
+        check_gpu()
+
+    def test_evaluate(self):
+        inf = InferenceCGSegmentation("/tf/workdir/DA_brain/saved_models/cg_XNet_t1_selu_True_segm_13319/",
+                                      self.data)
+        result1 = inf.evaluate()
