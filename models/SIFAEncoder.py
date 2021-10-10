@@ -179,7 +179,7 @@ class SIFAEncoder(ModelBase):
         x = self._dilated_residual_block(out1, 256)
         x = self._dilated_residual_block(x, 256)
 
-        # output layers (2xC512)
+        # output layers (2xC256)
         x = tf.keras.layers.Conv2D(256, kernel_size=3, strides=1, padding="same", kernel_initializer=self._kernel_init)(
             x)
         x = self._normalization_layer()(x)

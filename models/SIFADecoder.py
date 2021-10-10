@@ -92,3 +92,39 @@ class SIFADecoder(ModelBase):
         else:
             out = tf.tanh(x, name=self._output_name)
             return tf.keras.Model(inputs, out, name="Decoder")
+
+    def generate_model_small(self) -> tf.keras.Model:
+        """
+        Generate SIFA Decoder small keras model
+        """
+        # set seed
+        self._set_random_seed()
+
+        # input layer
+        inputs = tf.keras.Input(shape=self._input_shape, name=self._input_name)
+
+        # conv layer
+        x = self._simple_conv_block(inputs, 128, kernel_size=3, strides=1, kernel_init=self._kernel_init,
+                                    padding="same", do_norm=True)
+
+        # 3 x res net block
+        for idx in range(3):
+            x = self._residual_block(x)
+
+        # 3 deconv layers
+        dims = [64, 64, 32]
+        for idx in range(3):
+            x = self._simple_deconv_block(x, dims[idx], kernel_size=7, strides=2, padding="same",
+                                          kernel_init=self._kernel_init, do_norm=True, do_act=True)
+
+        # output layer
+        x = tf.keras.layers.Conv2D(self._output_classes, 7, strides=1, padding="same",
+                                   kernel_initializer=self._kernel_init)(x)
+
+        if self._skip is True:
+            inputs2 = tf.keras.Input(shape=self._input_shape2, name="tmp")
+            out = tf.tanh(inputs2 + x, name=self._output_name)
+            return tf.keras.Model([inputs, inputs2], out, name="Decoder")
+        else:
+            out = tf.tanh(x, name=self._output_name)
+            return tf.keras.Model(inputs, out, name="Decoder")

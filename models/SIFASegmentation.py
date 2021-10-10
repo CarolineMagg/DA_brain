@@ -64,6 +64,6 @@ class SIFASegmentation(ModelBase):
 
         x = self._simple_conv_block(inputs, self._output_classes, kernel_size=1, strides=1, kernel_init=self._kernel_init,
                                     do_norm=False, do_act=False, dropout_rate=0.75, padding="same")
-
+        x = tf.nn.sigmoid(x)
         out = tf.image.resize(x, (256, 256), name=self._output_name)
         return tf.keras.Model(inputs, out, name="Segmentation")
