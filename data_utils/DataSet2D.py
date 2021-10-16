@@ -76,9 +76,9 @@ class DataSet2D(tf.keras.utils.Sequence):
         if self._filter is not None:
             self.reduce_to_nonzero_segm(self._filter)
         self._segm_size = segm_size
-        if self._segm_size is not None:
-            self.reduce_greater_than_val_segm()
         self._balance = use_balance
+        if self._segm_size is not None and not self._balance:
+            self.reduce_greater_than_val_segm()
         if self._balance:
             self.balance_dataset()
 
@@ -316,8 +316,12 @@ class DataSet2D(tf.keras.utils.Sequence):
         self.list_index = []
         len_before = self._number_index
         logging.info(f"DataSet2D: balancing {len_before} data points for vs_class...")
+        if self._segm_size is None:
+            segm_size = 0
+        else:
+            segm_size = self._segm_size
         for idx, d in enumerate(self._data):
-            idx_vs_nonzero = d.get_non_zero_slices_segmentation()
+            idx_vs_nonzero = d.get_val_slices_segmentation(segm_size, self._dsize)
             idx_vs_zero = d.get_zero_slices_segmentation()
             blub = random.sample(idx_vs_zero, k=len(idx_vs_nonzero))
             self.list_index += [(idx, ix) for ix in sorted(blub + idx_vs_nonzero)]
