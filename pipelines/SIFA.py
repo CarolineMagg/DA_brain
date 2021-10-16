@@ -29,6 +29,7 @@ class SIFA:
 
     def __init__(self, data_dir, tensorboard_dir, checkpoints_dir, save_model_dir, sample_dir,
                  seed=13375, d_step=1, sample_step=500, cycle_loss_weight=10.0, identity_loss_weight=1.0,
+                 segm_loss_weight=10.0, segm_g_loss_weight=1.0, T_g_loss_weight=1.0,
                  dsize=(256, 256)):
         """
         SIFA Pipeline, ie generator and discriminator are trained in an iterative manner.
@@ -54,6 +55,9 @@ class SIFA:
         self.d_step = d_step
         self.sample_step = sample_step
         self.dsize = dsize
+        self.segm_loss_weight = segm_loss_weight
+        self.segm_g_loss_weight = segm_g_loss_weight
+        self.T_g_loss_weight = T_g_loss_weight
 
         # data
         self.train_set = None
@@ -71,7 +75,7 @@ class SIFA:
         #                            skip=False).generate_model()
         factory = SIFAGenerator(input_shape=(*self.dsize, 1), double_output=False)
         self.encoder = factory.generate_encoder_small()
-        self.segmentation1 = factory.generate_segmentation()
+        self.segmentation = factory.generate_segmentation()
         self.decoder = factory.generate_decoder_small()
 
         # discriminator
@@ -122,13 +126,13 @@ class SIFA:
                                         input_data=["t1"], input_name=["image"],
                                         output_data=["t2", "vs", "vs_class"],
                                         output_name=["generated_t2", "vs", "vs_class"],
-                                        batch_size=1, shuffle=True, p_augm=0.0, alpha=-1, beta=1, segm_size=10,
+                                        batch_size=1, shuffle=True, p_augm=0.0, alpha=-1, beta=1, segm_size=0,
                                         dsize=self.dsize)
         self.val_set = DataSet2DMixed(os.path.join(self.dir_data, "validation"),
                                       input_data=["t1"], input_name=["image"],
                                       output_data=["t2", "vs", "vs_class"],
                                       output_name=["generated_t2", "vs", "vs_class"],
-                                      batch_size=1, shuffle=False, p_augm=0.0, alpha=-1, beta=1, segm_size=10,
+                                      batch_size=1, shuffle=False, p_augm=0.0, alpha=-1, beta=1, segm_size=0,
                                       dsize=self.dsize, paired=True)
         logging.info("SIFA: training {0}, validation {1}".format(len(self.train_set), len(self.val_set)))
 
@@ -253,11 +257,11 @@ class SIFA:
         with tf.GradientTape() as tape:
             # segmentation for T
             T_latent = self.encoder(T, training=True)
-            T_segm = self.segmentation1(T_latent, training=True)
+            T_segm = self.segmentation(T_latent, training=True)
 
             # segmentation for S2T
             S2T_latent = self.encoder(S2T, training=True)
-            S2T_segm = self.segmentation1(S2T_latent, training=True)
+            S2T_segm = self.segmentation(S2T_latent, training=True)
 
             # discriminator loss
             T_segm_d_logits = self.D_P(T_segm * tf.expand_dims(T, axis=-1), training=True)
@@ -268,12 +272,12 @@ class SIFA:
             S2T_dice_coeff = DiceCoefficient()(S_seg, S2T_segm)
 
             # segmentation loss
-            Segm_loss = 10 * S2T_dice_loss + T_segm_g_loss + T_g_loss
+            Segm_loss = self.segm_loss_weight * S2T_dice_loss + self.segm_g_loss_weight * T_segm_g_loss + self.T_g_loss_weight * T_g_loss
 
         segm_grad = tape.gradient(Segm_loss,
-                                  self.encoder.trainable_variables + self.segmentation1.trainable_variables)
+                                  self.encoder.trainable_variables + self.segmentation.trainable_variables)
         self.Segm_optimizer.apply_gradients(zip(segm_grad,
-                                                self.encoder.trainable_variables + self.segmentation1.trainable_variables))
+                                                self.encoder.trainable_variables + self.segmentation.trainable_variables))
         del tape
 
         loss_dict = {'S2T_dice_loss': S2T_dice_loss,
@@ -379,7 +383,7 @@ class SIFA:
         self.checkpoint = Checkpoint(dict(G_S2T=self.G_S2T,
                                           Encoder=self.encoder,
                                           Decoder=self.decoder,
-                                          Segmentation=self.segmentation1,
+                                          Segmentation=self.segmentation,
                                           D_S=self.D_S,
                                           D_T=self.D_T,
                                           D_P=self.D_P,
@@ -415,7 +419,7 @@ class SIFA:
         self.G_S2T.save(os.path.join(self.dir_save_model, "G_S2T"))
         self.encoder.save(os.path.join(self.dir_save_model, "Encoder"))
         self.decoder.save(os.path.join(self.dir_save_model, "Decoder"))
-        self.segmentation1.save(os.path.join(self.dir_save_model, "Segmentation"))
+        self.segmentation.save(os.path.join(self.dir_save_model, "Segmentation"))
         self.D_S.save(os.path.join(self.dir_save_model, "D_S"))
         self.D_T.save(os.path.join(self.dir_save_model, "D_T"))
         self.D_P.save(os.path.join(self.dir_save_model, "D_P"))
@@ -426,14 +430,16 @@ class SIFA:
         Generate samples from current generators.
         """
         S2T = self.G_S2T(S, training=False)
-        T2S_latent = self.encoder(T, training=False)
-        T2S = self.decoder(T2S_latent, training=False)
-        S2T2S_latent = self.encoder(S2T, training=False)
-        S2T2S = self.decoder(S2T2S_latent, training=False)
+        T_latent = self.encoder(T, training=False)
+        T2S = self.decoder(T_latent, training=False)
+        T_segm = self.segmentation(T_latent, training=False)
+        S2T_latent = self.encoder(S2T, training=False)
+        S2T2S = self.decoder(S2T_latent, training=False)
+        S2T_segm = self.segmentation(S2T_latent, training=False)
         T2S2T = self.G_S2T(T2S, training=False)
-        return S2T, T2S, S2T2S, T2S2T
+        return S2T, T2S, S2T2S, T2S2T, T_segm, S2T_segm
 
-    def train(self, epochs=50, segm_epoch=50, data_nr=None, restore=True, step_decay=None):
+    def train(self, epochs0=0, epochs=50, segm_epoch=50, data_nr=None, restore=True, step_decay=None):
         """
         Train SIFA pipeline:
         1) initialize local variables
@@ -451,24 +457,24 @@ class SIFA:
         """
         logging.info("SIFA: set up training.")
 
-        G_loss_dict_list = {k: 0 for k in ['S2T_g_loss', 'T2S_g_loss', 'S2T2S_cycle_loss', 'T2S2T_cycle_loss',
-                                           'S2S_id_loss', 'T2T_id_loss']}
-        D_loss_dict_list = {k: 0 for k in ['S_d_loss', 'T_d_loss', 'Segm_d_loss']}
-        S_loss_dict_list = {k: 0 for k in ['S2T_dice_loss', 'S2T_dice_coeff', 'T_segm_g_loss', 'Segm_loss']}
         D_loss_dict = {'S_d_loss': tf.constant(100.0), 'T_d_loss': tf.constant(100.0),
                        'Segm_d_loss': tf.constant(100.0)}
 
         if data_nr is None or data_nr > len(self.train_set):
             data_nr = len(self.train_set)
+        self._set_optimizer((epochs + 1) * data_nr, (step_decay + 1) * data_nr)
         self._init_summary_file_writer(self.dir_tb)
         self._init_checkpoint(self.dir_cktp, restore=restore)
         if step_decay is None:
             step_decay = epochs // 2
-        self._set_optimizer((epochs + 1) * data_nr, (step_decay + 1) * data_nr)
 
         logging.info("SIFA: start training.")
-        for epoch in range(epochs + 1):
+        for epoch in range(epochs0, epochs + 1):
             total_time_per_epoch = 0
+            G_loss_dict_list = {k: 0 for k in ['S2T_g_loss', 'T2S_g_loss', 'S2T2S_cycle_loss', 'T2S2T_cycle_loss',
+                                               'S2S_id_loss', 'T2T_id_loss']}
+            D_loss_dict_list = {k: 0 for k in ['S_d_loss', 'T_d_loss', 'Segm_d_loss']}
+            S_loss_dict_list = {k: 0 for k in ['S2T_dice_loss', 'S2T_dice_coeff', 'T_segm_g_loss', 'Segm_loss']}
             print("Epoch {0}/{1}".format(epoch, epochs))
             for idx in range(data_nr):
                 # load data
@@ -499,16 +505,25 @@ class SIFA:
 
             for idx in range(len(self.val_set)):
                 # sample
-                if idx % self.sample_step == 0:  # todo: add segmentation plot
+                if idx % self.sample_step == 0:
                     A, B = self.val_set[idx]
                     A = A["image"]
+                    A_segm = B["vs"]
                     B = B["generated_t2"]
-                    A2B, B2A, A2B2A, B2A2B = self.sample(A, B)
+                    A2B, B2A, A2B2A, B2A2B, B_segm, A2B_segm = self.sample(A, B)
                     img = np.hstack(
-                        np.concatenate([tf.expand_dims(A, -1), A2B, A2B2A, tf.expand_dims(B, -1), B2A, B2A2B], axis=0))
+                        np.concatenate(
+                            [tf.expand_dims(A, -1), A2B, A2B2A, tf.expand_dims(B, -1), B2A, B2A2B], axis=0))
                     img = cv2.normalize(img, img, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
                     cv2.imwrite(os.path.join(self.dir_sample, 'iter-%03d-%05d.jpg' % (epoch, idx)),
                                 img)
+                    img2 = np.hstack(
+                        np.concatenate(
+                            [A2B, A2B_segm, tf.expand_dims(A_segm, -1), tf.expand_dims(B, -1), B_segm,
+                             tf.expand_dims(A_segm, -1)], axis=0))
+                    img2 = cv2.normalize(img2, img2, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
+                    cv2.imwrite(os.path.join(self.dir_sample, 'iter-%03d-%05d_segm.jpg' % (epoch, idx)),
+                                img2)
             self.val_set.reset()
 
             # tensorboard summary
