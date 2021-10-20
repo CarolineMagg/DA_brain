@@ -16,13 +16,13 @@ if __name__ == "__main__":
 
     print(f"Pre-Training with SIFA.")
     seed = 13385
-    d_step = 2
+    d_step = 5
     dsize = (256, 256)
     sample_step = 200
     cycle_consistency_loss = 10
     identity_loss = 1
     epochs = 50
-    segm_epochs = [2, 10, 25, 51]
+    segm_epochs = [5, 10, 25, 51]
     data_nr = None
     step_decay = 51
 
@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
         steps = 25
         numbers = epochs // steps
-        for idx in range(1, numbers):
+        for idx in range(0, numbers):
             sifa = SIFA(data_dir=data_dir,
                         tensorboard_dir=tensorboard_dir,
                         checkpoints_dir=checkpoints_dir,

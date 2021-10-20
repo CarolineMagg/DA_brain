@@ -8,7 +8,7 @@ from models.ModelBase import ModelBase
 __author__ = "c.magg"
 
 
-class SIFAGenerator(ModelBase):
+class CGSIFAGenerator(ModelBase):
     """
     Encoder+decoder+segmentation architecture for SIFA approach
 
@@ -33,14 +33,14 @@ class SIFAGenerator(ModelBase):
         assert len(input_name) == 3, "SIFAGenerator needs 3 input names."
         assert len(output_name) == 3, "SIFAGenerator needs 3 output names."
 
-        super(SIFAGenerator, self).__init__(input_shape=input_shape,
-                                            output_classes=output_classes,
-                                            activation=activation,
-                                            norm=norm,
-                                            kernel_init=kernel_init,
-                                            input_name=input_name,
-                                            output_name=output_name,
-                                            seed=seed)
+        super(CGSIFAGenerator, self).__init__(input_shape=input_shape,
+                                              output_classes=output_classes,
+                                              activation=activation,
+                                              norm=norm,
+                                              kernel_init=kernel_init,
+                                              input_name=input_name,
+                                              output_name=output_name,
+                                              seed=seed)
 
         self._kernel_init = tf.keras.initializers.TruncatedNormal(stddev=0.01)
         self._double_output = double_output

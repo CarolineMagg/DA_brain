@@ -13,12 +13,9 @@ import tensorflow as tf
 from data_utils.DataSet2DMixed import DataSet2DMixed
 from losses.dice import DiceLoss, DiceCoefficient
 from losses.gan import generator_loss_lsgan, cycle_consistency_loss, identity_loss, discriminator_loss_lsgan
-from models.ConvDecoder import ConvDecoder
-from models.ResnetEncoder import ResnetEncoder
-from models.ResnetGenerator import ResnetGenerator
+from models.CGSIFAGenerator import CGSIFAGenerator
 from models.ConvDiscriminator import ConvDiscriminator
-from models.SIFAGenerator import SIFAGenerator
-from models.SIFASegmentation import SIFASegmentation
+from models.ResnetGenerator import ResnetGenerator
 from pipelines.Checkpoint import Checkpoint
 from pipelines.LinearDecay import LinearDecay
 
@@ -68,12 +65,7 @@ class SIFA:
         # generator
         self.G_S2T = ResnetGenerator(n_blocks=4, n_downsampling=3, dim=32, input_shape=(*self.dsize, 1),
                                      skip=False).generate_model()
-        # self.encoder = ResnetEncoder(n_blocks=4, n_downsampling=3, dim=32, input_shape=(*self.dsize, 1),
-        #                              skip=False).generate_model()
-        # self.segmentation1 = SIFASegmentation(input_shape=(32, 32, 256)).generate_model()
-        # self.decoder = ConvDecoder(n_blocks=4, n_downsampling=3, dim=32, input_shape=(32, 32, 256),
-        #                            skip=False).generate_model()
-        factory = SIFAGenerator(input_shape=(*self.dsize, 1), double_output=False)
+        factory = CGSIFAGenerator(input_shape=(*self.dsize, 1), double_output=False)
         self.encoder = factory.generate_encoder_small()
         self.segmentation = factory.generate_segmentation()
         self.decoder = factory.generate_decoder_small()

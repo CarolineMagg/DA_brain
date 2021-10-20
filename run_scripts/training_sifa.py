@@ -12,7 +12,7 @@ sys.path.insert(0, parent)
 from pipelines.SIFA import SIFA
 from models.utils import check_gpu
 
-parser = argparse.ArgumentParser(description='Process supervised segm pipeline parameters.')
+parser = argparse.ArgumentParser(description='Process SIFA pipeline parameters.')
 parser.add_argument('--seed', dest='seed', default=1335, type=int,
                     help='set seed for pipeline init')
 parser.add_argument('--sample_step', dest='sample_step', default=200, type=int,
@@ -74,7 +74,8 @@ if __name__ == "__main__":
         logging.info(f"Set saved model to state of {args.pretrained}.")
         shutil.copytree(f"/tf/workdir/DA_brain/saved_models/{args.pretrained}", save_model_dir)
 
-    numbers = epochs//25
+    steps = 25
+    numbers = epochs // steps
     for idx in range(0, numbers):
         sifa = SIFA(data_dir=data_dir,
                     tensorboard_dir=tensorboard_dir,
@@ -89,5 +90,6 @@ if __name__ == "__main__":
                     segm_loss_weight=segm_loss_weight,
                     segm_g_loss_weight=segm_g_loss_weight,
                     T_g_loss_weight=T_g_loss_weight)
-        sifa.train(epochs0=idx * 25, epochs=idx * 25 + 25, segm_epoch=segm_epoch, data_nr=data_nr, restore=True,
+        sifa.train(epochs0=idx * steps, epochs=idx * steps + steps, segm_epoch=segm_epoch, data_nr=data_nr,
+                   restore=True,
                    step_decay=step_decay)
