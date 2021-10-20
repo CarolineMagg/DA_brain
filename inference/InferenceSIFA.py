@@ -6,6 +6,8 @@ import tensorflow as tf
 import numpy as np
 from heapq import nlargest, nsmallest
 
+from sklearn.metrics import confusion_matrix
+
 from data_utils.data_visualization import plot_predictions_separate_overlap, plot_predictions_separate
 from losses.dice import DiceLoss, DiceCoefficient
 from losses.gan import generator_loss_lsgan
@@ -59,12 +61,17 @@ class InferenceSIFA:
         """
         Evaluate inference pipeline
         """
-        dice, assd, segm_pred, T2_inputs, segm_gt = self._evaluate(opt_batch_size)
+        dice, assd, segm_pred, T2_inputs, segm_gt, tn, fp, fn, tp = self._evaluate(opt_batch_size)
 
         result = {'dice_coeff_mean': np.nanmean(dice),
                   'dice_coeff_std': np.nanstd(dice),
                   'assd_mean': np.nanmean(assd),
-                  'assd_std': np.nanstd(assd)}
+                  'assd_std': np.nanstd(assd),
+                  'tp': tp,
+                  'fp': fp,
+                  'fn': fn,
+                  'tn': tn,
+                  }
         if do_print:
             print(result)
         return result
@@ -96,8 +103,11 @@ class InferenceSIFA:
                     assd.append(metric.binary.assd(y_pred_thres, outputs["vs"][idx]))
                 else:
                     assd.append(np.NAN)
+        class_gt = [1 if np.sum(x) != 0 else 0 for x in segm_gt]
+        class_pred = [1 if np.sum(x) != 0 else 0 for x in segm_pred]
+        tn, fp, fn, tp = confusion_matrix(class_gt, class_pred, labels=[0, 1]).ravel()
         self._data_gen.batch_size = self._data_gen._number_index
-        return dc, assd, segm_pred, T2_inputs, segm_gt
+        return dc, assd, segm_pred, T2_inputs, segm_gt, tn, fp, fn, tp
 
     def get_k_results(self, k=4, opt_batch_size=5, do_plot=True):
         """
@@ -105,7 +115,7 @@ class InferenceSIFA:
         Optionally: plot the results of best/worst k results.
         """
         # calculate dice coeff
-        dice, assd, segm_pred, T2_inputs, segm_gt = self._evaluate(opt_batch_size)
+        dice, assd, segm_pred, T2_inputs, segm_gt, _, _, _, _ = self._evaluate(opt_batch_size)
 
         # top k dice results
         dice_top = nlargest(k, enumerate([d for d in dice]), key=lambda x: x[1])
@@ -113,7 +123,9 @@ class InferenceSIFA:
         targets = [segm_gt[k[0]] for k in dice_top]
         pred = [segm_pred[k[0]] for k in dice_top]
         assd_top = [assd[k[0]] for k in dice_top]
-        print(f"best {k} dice: {dice_top} \nwith assd: {assd_top}")
+        sz = [np.sum(s) for s in targets]
+        sz_pred = [np.sum(s) for s in pred]
+        print(f"best {k} dice: {dice_top} \nwith assd: {assd_top} \nwith original sz: {sz} \nwith pred sz: {sz_pred}")
         if do_plot:
             plot_predictions_separate(inputs, targets, pred)
 
@@ -123,6 +135,8 @@ class InferenceSIFA:
         targets = [segm_gt[k[0]] for k in dice_bottom]
         pred = [segm_pred[k[0]] for k in dice_bottom]
         assd_bottom = [assd[k[0]] for k in dice_top]
-        print(f"worst {k} dice: {dice_bottom} \nwith assd: {assd_bottom}")
+        sz = [np.sum(s) for s in targets]
+        sz_pred = [np.sum(s) for s in pred]
+        print(f"worst {k} dice: {dice_bottom} \nwith assd: {assd_bottom} \nwith original sz: {sz} \nwith pred sz: {sz_pred}")
         if do_plot:
             plot_predictions_separate(inputs, targets, pred)

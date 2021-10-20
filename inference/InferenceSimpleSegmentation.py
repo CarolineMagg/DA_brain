@@ -6,6 +6,7 @@ import tensorflow as tf
 from heapq import nlargest, nsmallest
 import numpy as np
 import medpy.metric as metric
+from sklearn.metrics import confusion_matrix
 
 from data_utils.data_visualization import plot_predictions_overlap
 from losses.dice import DiceLoss, DiceCoefficient
@@ -57,11 +58,16 @@ class InferenceSimpleSegmentation:
         """
         Evaluate inference pipeline
         """
-        dice, assd, segm_pred, _, _ = self._evaluate(opt_batch_size)
+        dice, assd, segm_pred, _, _, tn, fp, fn, tp = self._evaluate(opt_batch_size)
         result = {'dice_coeff_mean': np.nanmean(dice),
                   'dice_coeff_std': np.nanstd(dice),
                   'assd_mean': np.nanmean(assd),
-                  'assd_std': np.nanstd(assd)}
+                  'assd_std': np.nanstd(assd),
+                  'tp': tp,
+                  'fp': fp,
+                  'fn': fn,
+                  'tn': tn,
+                  }
         if do_print:
             print(result)
         return result
@@ -91,20 +97,24 @@ class InferenceSimpleSegmentation:
                 images.append(inputs["image"][idx])
                 segm_gt.append(outputs["vs"][idx])
                 segm_pred.append(y_pred_thres)
-                dc.append(metric.binary.dc(y_pred_thres, outputs["vs"][idx]))
-                if np.sum(y_pred_thres) != 0:
-                    assd.append(metric.binary.assd(y_pred_thres, outputs["vs"][idx]))
-                else:
-                    assd.append(np.NAN)
+                if np.sum(outputs["vs"][idx]) != 0:
+                    dc.append(metric.binary.dc(y_pred_thres, outputs["vs"][idx]))
+                    if np.sum(y_pred_thres) != 0:
+                        assd.append(metric.binary.assd(y_pred_thres, outputs["vs"][idx]))
+                    else:
+                        assd.append(np.NAN)
+        class_gt = [1 if np.sum(x) != 0 else 0 for x in segm_gt]
+        class_pred = [1 if np.sum(x) != 0 else 0 for x in segm_pred]
+        tn, fp, fn, tp = confusion_matrix(class_gt, class_pred, labels=[0, 1]).ravel()
         self.data_gen.batch_size = self.data_gen._number_index
-        return dc, assd, segm_pred, images, segm_gt
+        return dc, assd, segm_pred, images, segm_gt, tn, fp, fn, tp
 
     def get_k_results(self, k=4, do_plot=True):
         """
         Get k best/worst results and statistic with mean, median, std, max, min value of Dice Coefficient.
         Optionally: plot the results of best/worst k results.
         """
-        dice, assd, segm_pred, images, segm_gt = self._evaluate()
+        dice, assd, segm_pred, images, segm_gt, _, _, _, _ = self._evaluate()
 
         # top k dice results
         dice_top = nlargest(k, enumerate([d for d in dice]), key=lambda x: x[1])

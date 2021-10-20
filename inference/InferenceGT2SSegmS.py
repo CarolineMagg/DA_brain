@@ -6,6 +6,8 @@ import tensorflow as tf
 import numpy as np
 from heapq import nlargest, nsmallest
 
+from sklearn.metrics import confusion_matrix
+
 from data_utils.data_visualization import plot_predictions_separate_overlap
 from losses.dice import DiceLoss, DiceCoefficient
 from losses.gan import generator_loss_lsgan
@@ -66,7 +68,7 @@ class InferenceGT2SSegmS:
         """
         Evaluate inference pipeline
         """
-        dice, assd, S_pred, segm_pred, S_pred_d, S_gt_d, S_inputs, _, _ = self._evaluate(opt_batch_size)
+        dice, assd, S_pred, segm_pred, S_pred_d, S_gt_d, S_inputs, _, _, tn, fp, fn, tp = self._evaluate(opt_batch_size)
         mse_loss = tf.reduce_mean(tf.keras.losses.mean_squared_error(S_pred, tf.expand_dims(S_inputs, -1)))
         d_loss = generator_loss_lsgan(S_pred_d) if S_gt_d is not None else None
 
@@ -75,7 +77,12 @@ class InferenceGT2SSegmS:
                   'dice_coeff_mean': np.nanmean(dice),
                   'dice_coeff_std': np.nanstd(dice),
                   'assd_mean': np.nanmean(assd),
-                  'assd_std': np.nanstd(assd)}
+                  'assd_std': np.nanstd(assd),
+                  'tp': tp,
+                  'fp': fp,
+                  'fn': fn,
+                  'tn': tn,
+                  }
         if do_print:
             print(result)
         return result
@@ -110,13 +117,17 @@ class InferenceGT2SSegmS:
                 S_inputs.append(inputs["image"][idx])
                 T_inputs.append(inputs["t2"][idx])
                 segm_gt.append(outputs["vs"][idx])
-                dc.append(metric.binary.dc(y_pred_thres, outputs["vs"][idx]))
-                if np.sum(y_pred_thres) != 0:
-                    assd.append(metric.binary.assd(y_pred_thres, outputs["vs"][idx]))
-                else:
-                    assd.append(np.NAN)
+                if np.sum(outputs["vs"][idx]) != 0:
+                    dc.append(metric.binary.dc(y_pred_thres, outputs["vs"][idx]))
+                    if np.sum(y_pred_thres) != 0:
+                        assd.append(metric.binary.assd(y_pred_thres, outputs["vs"][idx]))
+                    else:
+                        assd.append(np.NAN)
+        class_gt = [1 if np.sum(x) != 0 else 0 for x in segm_gt]
+        class_pred = [1 if np.sum(x) != 0 else 0 for x in segm_pred]
+        tn, fp, fn, tp = confusion_matrix(class_gt, class_pred, labels=[0, 1]).ravel()
         self._data_gen.batch_size = self._data_gen._number_index
-        return dc, assd, S_pred, segm_pred, S_pred_d, S_gt_d, S_inputs, T_inputs, segm_gt
+        return dc, assd, S_pred, segm_pred, S_pred_d, S_gt_d, S_inputs, T_inputs, segm_gt, tn, fp, fn, tp
 
     def get_k_results(self, k=4, opt_batch_size=5, do_plot=True):
         """
@@ -124,7 +135,7 @@ class InferenceGT2SSegmS:
         Optionally: plot the results of best/worst k results.
         """
         # calculate dice coeff
-        dice, assd, S_pred, segm_pred, S_pred_d, S_gt_d, S_inputs, T_inputs, segm_gt = self._evaluate(opt_batch_size)
+        dice, assd, S_pred, segm_pred, S_pred_d, S_gt_d, S_inputs, T_inputs, segm_gt, _,_,_,_ = self._evaluate(opt_batch_size)
 
         # top k dice results
         dice_top = nlargest(k, enumerate([d for d in dice]), key=lambda x: x[1])

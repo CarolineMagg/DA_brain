@@ -5,7 +5,8 @@ import cv2
 import tensorflow as tf
 from heapq import nlargest, nsmallest
 import numpy as np
-import medpy.metric as metric
+from medpy import metric
+from sklearn.metrics import confusion_matrix
 
 from data_utils.data_visualization import plot_predictions_overlap
 
@@ -49,21 +50,22 @@ class InferenceCGSegmentation:
             inputs = tf.expand_dims(tf.expand_dims(inputs, 0), -1)
         return self.model.predict(inputs)
 
-    def evaluate(self, opt_batch_size=5):
+    def evaluate(self, opt_batch_size=5, do_print=True):
         """
         Evaluate inference pipeline
         """
-        dice, assd, tp, tn, _, _, _, _, _ = self._evaluate(opt_batch_size)
+        dice, assd, tp, tn, fp, fn, _, _, _, _, _ = self._evaluate(opt_batch_size)
         result = {'dice_coeff_mean': np.nanmean(dice),
                   'dice_coeff_std': np.nanstd(dice),
                   'assd_mean': np.nanmean(assd),
                   'assd_std': np.nanstd(assd),
-                  'tp_mean': np.nanmean(tp),
-                  'tp_std': np.nanstd(tp),
-                  'tn_mean': np.nanmean(tn),
-                  'tn_std': np.nanstd(tn),
+                  'tp': tp,
+                  'fp': fp,
+                  'fn': fn,
+                  'tn': tn,
                   }
-        print(result)
+        if do_print:
+            print(result)
         return result
 
     def _evaluate(self, opt_batch_size=5):
@@ -82,8 +84,6 @@ class InferenceCGSegmentation:
         images = []
         dc = []
         assd = []
-        tp = []
-        tn = []
         for idx in range(len(self.data_gen)):
             inputs, outputs = self.data_gen[idx]
             y_pred, y_class = self.infer(inputs["image"])
@@ -93,23 +93,23 @@ class InferenceCGSegmentation:
                 segm_gt.append(outputs["vs"][idx])
                 class_gt.append(outputs["vs_class"][idx])
                 segm_pred.append(y_pred_thres)
-                class_pred.append(y_class)
-                dc.append(metric.binary.dc(y_pred_thres, outputs["vs"][idx]))
-                if np.sum(y_pred_thres) != 0 and np.sum(outputs["vs"][idx]) != 0:
-                    assd.append(metric.binary.assd(y_pred_thres, outputs["vs"][idx]))
-                else:
-                    assd.append(np.NAN)
-                tp.append(metric.binary.true_positive_rate(y_class, outputs["vs_class"][idx]))
-                tn.append(metric.binary.true_negative_rate(y_class, outputs["vs_class"][idx]))
+                class_pred.append(1) if y_class[idx] >= 0.5 else class_pred.append(0)
+                if outputs["vs_class"][idx] == 1:
+                    dc.append(metric.binary.dc(y_pred_thres, outputs["vs"][idx]))
+                    if np.sum(y_pred_thres) != 0 and np.sum(outputs["vs"][idx]) != 0:
+                        assd.append(metric.binary.assd(y_pred_thres, outputs["vs"][idx]))
+                    else:
+                        assd.append(np.NAN)
+        tn, fp, fn, tp = confusion_matrix(class_gt, class_pred, labels=[0, 1]).ravel()
         self.data_gen.batch_size = self.data_gen._number_index
-        return dc, assd, tp, tn, segm_pred, class_pred, images, segm_gt, class_gt
+        return dc, assd, tp, tn, fp, fn, segm_pred, class_pred, images, segm_gt, class_gt
 
-    def get_k_results(self, k=4, plot=True):
+    def get_k_results(self, k=4, do_plot=True):
         """
         Get k best/worst results and statistic with mean, median, std, max, min value of Dice Coefficient.
         Optionally: plot the results of best/worst k results.
         """
-        dice, assd, tp, tn, segm_pred, class_pred, images, segm_gt, class_gt = self._evaluate()
+        dice, assd, _, _, _, _, segm_pred, class_pred, images, segm_gt, class_gt = self._evaluate()
 
         # top k dice results
         dice_top = nlargest(k, enumerate([d for d in dice]), key=lambda x: x[1])
@@ -117,8 +117,10 @@ class InferenceCGSegmentation:
         targets = [segm_gt[k[0]] for k in dice_top]
         pred = [segm_pred[k[0]] for k in dice_top]
         assd_top = [assd[k[0]] for k in dice_top]
-        print(f"best {k} dice: {dice_top} \nwith assd: {assd_top}")
-        if plot:
+        sz = [np.sum(s) for s in targets]
+        sz_pred = [np.sum(s) for s in pred]
+        print(f"best {k} dice: {dice_top} \nwith assd: {assd_top} \nwith original sz: {sz} \nwith pred sz: {sz_pred}")
+        if do_plot:
             plot_predictions_overlap(inputs, targets, pred)
 
         # bottom k dice results
@@ -127,6 +129,8 @@ class InferenceCGSegmentation:
         targets = [segm_gt[k[0]] for k in dice_bottom]
         pred = [segm_pred[k[0]] for k in dice_bottom]
         assd_bottom = [assd[k[0]] for k in dice_bottom]
-        print(f"worst {k} dice: {dice_bottom} \nwith assd: {assd_bottom}")
-        if plot:
+        sz = [np.sum(s) for s in targets]
+        sz_pred = [np.sum(s) for s in pred]
+        print(f"best {k} dice: {dice_top} \nwith assd: {assd_bottom} \nwith original sz: {sz} \nwith pred sz: {sz_pred}")
+        if do_plot:
             plot_predictions_overlap(inputs, targets, pred)
