@@ -4,6 +4,7 @@
 
 import tensorflow as tf
 from models.ModelBase import ModelBase
+from models.utils import check_gpu
 
 __author__ = "c.magg"
 
@@ -101,3 +102,9 @@ class ResnetGenerator(ModelBase):
         else:
             out = tf.tanh(x, name=self._output_name)
             return tf.keras.Model(inputs, out, name="ResnetGenerator")
+
+
+if __name__ == "__main__":
+    check_gpu()
+    model = ResnetGenerator(n_blocks=9, input_shape=(256, 256, 1)).generate_model()
+    print(model.summary())

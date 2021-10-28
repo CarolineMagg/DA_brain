@@ -2,9 +2,9 @@
 # UNet model architecture
 ########################################################################################################################
 import logging
-
 import tensorflow as tf
 from models.ModelBase import ModelBase
+from models.utils import check_gpu
 
 __author__ = "c.magg"
 
@@ -112,3 +112,9 @@ class UNet(ModelBase):
             output = [output1, output2]
 
         return tf.keras.Model(img_input, output, name="UNet")
+
+
+if __name__ == "__main__":
+    check_gpu()
+    model = UNet(input_shape=(256, 256, 1)).generate_model()
+    print(model.summary())

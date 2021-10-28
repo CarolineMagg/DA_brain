@@ -5,6 +5,7 @@ import logging
 import tensorflow as tf
 
 from models.ModelBase import ModelBase
+from models.utils import check_gpu
 
 __author__ = "c.magg"
 
@@ -149,3 +150,9 @@ class XNet_ClassGuided(ModelBase):
             output = [output1, output2, cgm]
 
         return tf.keras.Model(img_input, output, name="XNet")
+
+
+if __name__ == "__main__":
+    check_gpu()
+    model = XNet_ClassGuided(input_shape=(256, 256, 1)).generate_model()
+    print(model.summary())

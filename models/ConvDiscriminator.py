@@ -4,6 +4,7 @@
 
 import tensorflow as tf
 from models.ModelBase import ModelBase
+from models.utils import check_gpu
 
 __author__ = "c.magg"
 
@@ -97,3 +98,10 @@ class ConvDiscriminator(ModelBase):
         out = tf.expand_dims(x[..., 0], axis=3), tf.expand_dims(x[..., 1], axis=3)
 
         return tf.keras.Model(inputs, out, name="ConvDiscriminator")
+
+
+if __name__ == "__main__":
+    check_gpu()
+    model = ConvDiscriminator(input_shape=(256,256,1)).generate_model()
+    print(model.summary())
+
