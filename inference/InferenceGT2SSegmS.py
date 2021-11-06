@@ -63,6 +63,8 @@ class InferenceGT2SSegmS(InferenceBase):
             S_d_gen = self.D_S(S_generated)
             S_d_gt = self.D_S(reference)
         segmentation = self.segmentor.predict((S_generated + 1) / 2)
+        if type(segmentation) == list and len(segmentation) == 2:
+            segmentation = segmentation[0]
         return S_generated, segmentation, S_d_gen, S_d_gt
 
     def evaluate(self, opt_batch_size=1, do_print=True):

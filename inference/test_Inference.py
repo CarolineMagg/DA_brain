@@ -92,6 +92,18 @@ class TestInferenceGT2SSegmS(TestCase):
         self.assertEqual(None, a)
         self.assertEqual(None, b)
 
+    def test_cg_infer(self):
+        inf = InferenceGT2SSegmS("/tf/workdir/DA_brain/saved_models/gan_1_100_50_13785/G_T2S",
+                                 "/tf/workdir/DA_brain/saved_models/cg_XNet_t1_relu_True_segm_13319",
+                                 "/tf/workdir/DA_brain/saved_models/gan_1_100_50_13785/D_S",
+                                 self.data)
+        self.data.batch_size = 4
+        S_gen, segm_pred, a, b = inf.infer(self.data[0][0], False)
+        self.assertTupleEqual((4, 256, 256, 1), np.shape(S_gen.numpy()))
+        self.assertTupleEqual((4, 256, 256, 1), np.shape(segm_pred))
+        self.assertEqual(None, a)
+        self.assertEqual(None, b)
+
     def test_evaluate(self):
         inf = InferenceGT2SSegmS("/tf/workdir/DA_brain/saved_models/gan_1_100_50_13785/G_T2S",
                                  "/tf/workdir/DA_brain/saved_models/XNet_t1_relu_segm_13318",
