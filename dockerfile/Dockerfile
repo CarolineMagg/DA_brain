@@ -49,7 +49,10 @@ RUN pip3.6 --no-cache-dir install \
 	nibabel \
 	albumentations \
 	tensorflow-addons \
-	pylib
+	pylib \
+	plotly==5.3.1 \
+	jupyter-dash \
+	kaleido
 	
 # vtk
 #RUN mkdir -p /src/vtk
