@@ -3,6 +3,7 @@
 ########################################################################################################################
 import numpy as np
 import tensorflow as tf
+from heapq import nlargest, nsmallest
 
 from inference.InferenceBase import InferenceBase
 from losses.gan import generator_loss_lsgan
@@ -16,7 +17,7 @@ class InferenceGenerator(InferenceBase):
     workflow: T -> GT2S -> S' or S -> G2ST -> T'
     """
 
-    def __init__(self, G_dir, D_dir, data_gen, target="t2"):
+    def __init__(self, G_dir, D_dir, data_gen, target="t2", source="t1"):
         """
         Create Inference object
         :param G_dir: path to Generator T2S
@@ -27,6 +28,7 @@ class InferenceGenerator(InferenceBase):
         super(InferenceGenerator, self).__init__([G_dir, D_dir], data_gen)
         if self.data_gen._alpha != -1 and self.data_gen._beta != 1:
             raise ValueError("Dataset generator has wrong alpha, beta values.")
+        self.source = source
         self.target = target
 
     def load_models(self):
@@ -38,11 +40,11 @@ class InferenceGenerator(InferenceBase):
         Create prediction of inputs and discriminator results if reference is given.
         """
         if reference:
-            reference = inputs["image"]
-            inputs = inputs[self.target]
+            reference = inputs[self.target]
+            inputs = inputs[self.source]
         else:
             reference = None
-            inputs = inputs[self.target]
+            inputs = inputs[self.source]
         if not isinstance(inputs, np.ndarray):
             inputs = np.stack(inputs)
         if len(np.shape(inputs)) == 2:
@@ -94,8 +96,8 @@ class InferenceGenerator(InferenceBase):
                 S_pred.append(T2S[idx])
                 S_pred_d.append(T2S_d[idx])
                 S_gt_d.append(S_d[idx])
-                reference.append(inputs["image"][idx])
-                images.append(inputs[self.target][idx])
+                reference.append(inputs[self.target][idx])
+                images.append(inputs[self.source][idx])
         self.data_gen.batch_size = self.data_gen._number_index
         return images, reference, S_pred, S_pred_d, S_gt_d
 
@@ -104,4 +106,14 @@ class InferenceGenerator(InferenceBase):
         Get k best/worst results wrt Dice Coefficient.
         Optionally: plot the results of best/worst k results.
         """
-        raise NotImplementedError
+        images, reference, S_pred, S_pred_d, S_gt_d = self._evaluate(1)
+        mse_loss = tf.keras.losses.mean_squared_error(S_pred, tf.expand_dims(reference, -1))
+
+        # top k dice results
+        mse_top = nlargest(k, enumerate([tf.reduce_mean(d).numpy() for d in mse_loss]), key=lambda x: x[1])
+        print(f"worst {k} mse: {mse_top}")
+
+        # bottom k dice results
+        mse_bottom = nsmallest(k, enumerate([tf.reduce_mean(d).numpy() for d in mse_loss]), key=lambda x: x[1])
+        print(f"best {k} mse: {mse_bottom}")
+
