@@ -3,7 +3,9 @@
 ########################################################################################################################
 
 import tensorflow as tf
+import tensorflow_addons as tfa
 from models.ModelBase import ModelBase
+from models.utils import check_gpu
 
 __author__ = "c.magg"
 
@@ -29,9 +31,9 @@ class CGSIFAGenerator(ModelBase):
         if input_name is None:
             input_name = ["image", "feature_space", "feature_space"]
         if output_name is None:
-            output_name = ["feature_space", "generated", "vs"]
-        assert len(input_name) == 3, "SIFAGenerator needs 3 input names."
-        assert len(output_name) == 3, "SIFAGenerator needs 3 output names."
+            output_name = ["feature_space", "generated", "vs", "vs_class"]
+        assert len(input_name) == 3 or len(input_name) == 4, "SIFAGenerator needs 3 or 4 input names."
+        assert len(output_name) == 3 or len(output_name) == 4, "SIFAGenerator needs 3 or 4 output names."
 
         super(CGSIFAGenerator, self).__init__(input_shape=input_shape,
                                               output_classes=output_classes,
@@ -291,3 +293,72 @@ class CGSIFAGenerator(ModelBase):
                                      name=self._output_name[2])(x)
 
         return tf.keras.Model(inputs, out, name="Segmentation")
+
+    def generate_cg_segmentation(self):
+        """
+        Generate classification-guided SIFA segmentation
+        """
+
+        # input layer
+        inputs = tf.keras.Input(shape=self._feature_shape, name=self._input_name[2])
+        # conv layer
+        x = self._simple_conv_block(inputs, 128, kernel_size=3, strides=1, kernel_init=self._kernel_init,
+                                    padding="same", do_norm=True)
+
+        # 3 deconv layers
+        dims = [64, 64, 32]
+        for idx in range(3):
+            x = self._simple_deconv_block(x, dims[idx], kernel_size=7, strides=2, padding="same",
+                                          kernel_init=self._kernel_init, do_norm=True, do_act=True)
+
+        # cgm
+        cgm = tf.keras.layers.Dropout(rate=0.5)(inputs)
+        cgm = tf.keras.layers.Conv2D(filters=32, kernel_size=3, strides=1, padding="same",
+                                     kernel_initializer=self._kernel_init)(cgm)
+        cgm = tf.keras.layers.Conv2D(filters=1, kernel_size=1, strides=1, padding="same",
+                                     kernel_initializer=self._kernel_init)(cgm)
+        #  cgm = tfa.layers.AdaptiveMaxPooling2D(output_size=1)(cgm)
+        cgm = tf.keras.layers.GlobalMaxPool2D()(cgm)
+        cgm = tf.keras.layers.Activation("sigmoid", name=self._output_name[3])(cgm)
+        # cgm_channel = tf.where(cgm >= 0.5, 1., 0.)
+        # cgm_channel = tf.expand_dims(tf.expand_dims(cgm_channel, axis=1), axis=1)
+
+        # output layer
+        out = tf.keras.layers.Conv2D(self._output_classes, 7, strides=1, padding="same",
+                                     kernel_initializer=self._kernel_init, activation="sigmoid")(x)
+        # output = tf.keras.layers.Multiply(name=self._output_name[2])([out, cgm_channel])
+
+        return tf.keras.Model(inputs, [out, cgm], name="Segmentation")
+
+    def generate_cgm(self):
+        """
+        Generate Classification-guided Module
+        """
+        # input layer
+        inputs = tf.keras.Input(shape=self._feature_shape, name=self._input_name[2])
+
+        # cgm
+        cgm = tf.keras.layers.Dropout(rate=0.5)(inputs)
+        cgm = tf.keras.layers.Conv2D(filters=32, kernel_size=3, strides=1, padding="same",
+                                     kernel_initializer=self._kernel_init)(cgm)
+        cgm = tf.keras.layers.Conv2D(filters=1, kernel_size=1, strides=1, padding="same",
+                                     kernel_initializer=self._kernel_init)(cgm)
+        #  cgm = tfa.layers.AdaptiveMaxPooling2D(output_size=1)(cgm)
+        cgm = tf.keras.layers.GlobalMaxPool2D()(cgm)
+        cgm = tf.keras.layers.Activation("sigmoid", name=self._output_name[3])(cgm)
+        # post-processing
+        #  cgm_channel = tf.where(cgm >= 0.5, 1., 0.)
+        #  cgm_channel = tf.expand_dims(tf.expand_dims(cgm_channel, axis=1), axis=1)
+
+        return tf.keras.Model(inputs, cgm, name="CG Segmentation")
+
+
+if __name__ == "__main__":
+    check_gpu()
+    factory = CGSIFAGenerator(input_shape=(256, 256, 1), double_output=False)
+    encoder = factory.generate_encoder_small()
+    segmentation = factory.generate_segmentation()
+    decoder = factory.generate_decoder_small()
+    print(encoder.summary(line_length=150))
+    print(segmentation.summary(line_length=150))
+    print(decoder.summary(line_length=150))

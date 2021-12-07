@@ -4,16 +4,15 @@
 
 import tensorflow as tf
 from models.ModelBase import ModelBase
-from models.utils import check_gpu
 
 __author__ = "c.magg"
 
+from models.utils import check_gpu
 
-class ResnetGenerator(ModelBase):
+
+class ResnetEncoder(ModelBase):
     """
-    ResnetGenerator architecture.
-
-    based on github repo https://github.com/LynnHo/CycleGAN-Tensorflow-2
+    ResnetEncoder
     """
 
     def __init__(self,
@@ -27,18 +26,18 @@ class ResnetGenerator(ModelBase):
                  kernel_init='glorot_uniform',
                  padding="reflect",
                  input_name="image",
-                 output_name="generated",
+                 output_name="latent",
                  skip=False,
                  seed=13317):
 
-        super(ResnetGenerator, self).__init__(input_shape=input_shape,
-                                              output_classes=output_classes,
-                                              activation=activation,
-                                              norm=norm,
-                                              kernel_init=kernel_init,
-                                              input_name=input_name,
-                                              output_name=output_name,
-                                              seed=seed)
+        super(ResnetEncoder, self).__init__(input_shape=input_shape,
+                                            output_classes=output_classes,
+                                            activation=activation,
+                                            norm=norm,
+                                            kernel_init=kernel_init,
+                                            input_name=input_name,
+                                            output_name=output_name,
+                                            seed=seed)
 
         self._n_downsampling = n_downsampling
         self._n_blocks = n_blocks
@@ -85,16 +84,6 @@ class ResnetGenerator(ModelBase):
         for _ in range(self._n_blocks):
             x = self._residual_block(x)
 
-        # up sampling
-        for _ in range(self._n_downsampling):
-            dim = dim / 2
-            x = tf.keras.layers.Conv2DTranspose(dim, 3, strides=2, padding="same", use_bias=False)(x)
-            x = self._normalization_layer()(x)
-            x = self._get_act_layer(self._activation)(x)
-
-        # last layer
-        x = tf.pad(x, [[0, 0], [3, 3], [3, 3], [0, 0]], mode=self._padding)
-        x = tf.keras.layers.Conv2D(self._output_classes, 7, padding="valid", use_bias=True)(x)
         if self._skip is True:
             inputs2 = tf.keras.Input(shape=self._input_shape, name="tmp")
             out = tf.tanh(inputs + x, name=self._output_name)
@@ -106,9 +95,5 @@ class ResnetGenerator(ModelBase):
 
 if __name__ == "__main__":
     check_gpu()
-    model = ResnetGenerator(n_blocks=9, input_shape=(256, 256, 1)).generate_model()
-    print(model.summary(line_length=150))
-
-    model = ResnetGenerator(n_blocks=4, n_downsampling=3, dim=32, input_shape=(256, 256, 1),
-                            skip=False).generate_model()
+    model = ResnetGenerator(n_blocks=9, input_shape=(256,256, 1)).generate_model()
     print(model.summary(line_length=150))

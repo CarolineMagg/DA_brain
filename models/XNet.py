@@ -141,4 +141,5 @@ class XNet(ModelBase):
 if __name__ == "__main__":
     check_gpu()
     model = XNet(input_shape=(256, 256, 1)).generate_model()
-    print(model.summary())
+    print(model.summary(line_length=150))
+    tf.keras.utils.plot_model(model, to_file="xnet.png", show_shapes=True)

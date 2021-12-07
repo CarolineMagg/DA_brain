@@ -155,4 +155,4 @@ class XNet_ClassGuided(ModelBase):
 if __name__ == "__main__":
     check_gpu()
     model = XNet_ClassGuided(input_shape=(256, 256, 1)).generate_model()
-    print(model.summary())
+    print(model.summary(line_length=150))

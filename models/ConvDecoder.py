@@ -4,16 +4,13 @@
 
 import tensorflow as tf
 from models.ModelBase import ModelBase
-from models.utils import check_gpu
 
 __author__ = "c.magg"
 
 
-class ResnetGenerator(ModelBase):
+class ConvDecoder(ModelBase):
     """
-    ResnetGenerator architecture.
-
-    based on github repo https://github.com/LynnHo/CycleGAN-Tensorflow-2
+    ConvDecoder
     """
 
     def __init__(self,
@@ -26,19 +23,19 @@ class ResnetGenerator(ModelBase):
                  norm="instance_norm",
                  kernel_init='glorot_uniform',
                  padding="reflect",
-                 input_name="image",
+                 input_name="latent",
                  output_name="generated",
                  skip=False,
                  seed=13317):
 
-        super(ResnetGenerator, self).__init__(input_shape=input_shape,
-                                              output_classes=output_classes,
-                                              activation=activation,
-                                              norm=norm,
-                                              kernel_init=kernel_init,
-                                              input_name=input_name,
-                                              output_name=output_name,
-                                              seed=seed)
+        super(ConvDecoder, self).__init__(input_shape=input_shape,
+                                          output_classes=output_classes,
+                                          activation=activation,
+                                          norm=norm,
+                                          kernel_init=kernel_init,
+                                          input_name=input_name,
+                                          output_name=output_name,
+                                          seed=seed)
 
         self._n_downsampling = n_downsampling
         self._n_blocks = n_blocks
@@ -71,19 +68,10 @@ class ResnetGenerator(ModelBase):
 
         # input layer
         inputs = tf.keras.Input(shape=self._input_shape, name=self._input_name)
+        x = inputs
 
-        # first block
-        x = tf.pad(inputs, [[0, 0], [3, 3], [3, 3], [0, 0]], mode=self._padding)
-        x = self._simple_conv_block(x, dim, kernel_size=7, padding="valid", use_bias=False)
-
-        # down sampling
         for _ in range(self._n_downsampling):
             dim = dim * 2
-            x = self._simple_conv_block(x, dim, kernel_size=3, strides=2, padding="same", use_bias=False)
-
-        # blocks
-        for _ in range(self._n_blocks):
-            x = self._residual_block(x)
 
         # up sampling
         for _ in range(self._n_downsampling):
@@ -102,13 +90,3 @@ class ResnetGenerator(ModelBase):
         else:
             out = tf.tanh(x, name=self._output_name)
             return tf.keras.Model(inputs, out, name="ResnetGenerator")
-
-
-if __name__ == "__main__":
-    check_gpu()
-    model = ResnetGenerator(n_blocks=9, input_shape=(256, 256, 1)).generate_model()
-    print(model.summary(line_length=150))
-
-    model = ResnetGenerator(n_blocks=4, n_downsampling=3, dim=32, input_shape=(256, 256, 1),
-                            skip=False).generate_model()
-    print(model.summary(line_length=150))

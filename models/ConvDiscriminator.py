@@ -57,11 +57,11 @@ class ConvDiscriminator(ModelBase):
                                     do_norm=False)
 
         # down sampling
-        for _ in range(self._n_downsampling-1):
-            dim = min(dim*2, dim_ * 8)
+        for _ in range(self._n_downsampling - 1):
+            dim = min(dim * 2, dim_ * 8)
             x = self._simple_conv_block(x, dim, kernel_size=4, strides=2, padding="same", use_bias=False)
 
-        dim = min(dim*2, dim_*8)
+        dim = min(dim * 2, dim_ * 8)
         x = self._simple_conv_block(x, dim, kernel_size=4, strides=1, padding="same", use_bias=False)
 
         # last layer
@@ -86,11 +86,11 @@ class ConvDiscriminator(ModelBase):
                                     do_norm=False)
 
         # down sampling
-        for _ in range(self._n_downsampling-1):
-            dim = min(dim*2, dim_ * 8)
+        for _ in range(self._n_downsampling - 1):
+            dim = min(dim * 2, dim_ * 8)
             x = self._simple_conv_block(x, dim, kernel_size=4, strides=2, padding="same", use_bias=False)
 
-        dim = min(dim*2, dim_*8)
+        dim = min(dim * 2, dim_ * 8)
         x = self._simple_conv_block(x, dim, kernel_size=4, strides=1, padding="same", use_bias=False)
 
         # last layer
@@ -102,6 +102,8 @@ class ConvDiscriminator(ModelBase):
 
 if __name__ == "__main__":
     check_gpu()
-    model = ConvDiscriminator(input_shape=(256,256,1)).generate_model()
-    print(model.summary())
+    model = ConvDiscriminator(input_shape=(256, 256, 1)).generate_model()
+    print(model.summary(line_length=150))
 
+    model = ConvDiscriminator(input_shape=(256, 256, 1), dim=32).generate_model()
+    print(model.summary(line_length=150))
