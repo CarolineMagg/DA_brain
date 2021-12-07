@@ -21,14 +21,14 @@ if __name__ == "__main__":
     sample_step = 200
     cycle_consistency_loss = 10
     identity_loss = 1
-    epochs = 50
-    segm_epochs = [5, 10, 25, 51]
+    epochs = 51
+    segm_epochs = [25]  # [5, 10, 25, 51]
     data_nr = None
     step_decay = 51
 
     for segm_epoch in segm_epochs:
 
-        identifier = f"pretrained_sifa_{d_step}_{epochs}_{segm_epoch}_{seed}"
+        identifier = f"pretrained_sifa_{d_step}_{epochs}_{segm_epoch}_{seed}_v2"
         tensorboard_dir = f"/tf/workdir/DA_brain/logs/{identifier}/"
         checkpoints_dir = f"/tf/workdir/DA_brain/saved_models/{identifier}/checkpoints/"
         save_model_dir = f"/tf/workdir/DA_brain/saved_models/{identifier}/"
