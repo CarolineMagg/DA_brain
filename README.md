@@ -1,6 +1,30 @@
 # Domain Adaptation for Brain VS segmentation
 
+This work was done as part of a master thesis.
 
+Two domain adaptation frameworks that utilize image alignment with CycleGAN [1] and supervised VS segmentation networks with X-Net [2], which can be interpretated as two U-Nets with skip connections in series. Both approaches are enhanced with a classification-guided module [3] that trains classification and segmentation together. In addition, an image and feature alginment framework based on SIFA [4] with classification-guided module enhancement was designed.
+
+![alt text](https://github.com/CarolineMagg/DA_brain/blob/main/domain_adaptation.png)
+
+[1] J.-Y. Zhu, T. Park, P. Isola, and A. A. Efros. Unpaired image-to-image translation
+using cycle-consistent adversarial networks. In 2017 IEEE International Conference
+on Computer Vision (ICCV), pages 2242–2251, 2017.
+
+[2] J. Bullock, C. Cuesta-Lázaro, and A. Quera-Bofarull. XNet: a convolutional neural
+network (CNN) implementation for medical X-Ray image segmentation suitable
+for small datasets. In Medical Imaging 2019: Biomedical Applications in Molecular,
+Structural, and Functional Imaging, volume 10953, pages 453 – 463. International
+Society for Optics and Photonics, SPIE, 2019.
+
+[3] H. Huang, L. Lin, R. Tong, H. Hu, Q. Zhang, Y. Iwamoto, X. Han, Y.-W. Chen, and
+J. Wu. UNet 3+: A Full-Scale Connected UNet for Medical Image Segmentation.
+In ICASSP 2020 - 2020 IEEE International Conference on Acoustics, Speech and
+Signal Processing (ICASSP), pages 1055–1059, 2020.
+
+[4] C. Chen, Q. Dou, H. Chen, J. Qin, and P. A. Heng. Unsupervised Bidirectional
+Cross-Modality Adaptation via Deeply Synergistic Image and Feature Alignment for
+Medical Image Segmentation. IEEE Transactions on Medical Imaging, 39(7):2494–
+2505, 2020.
 
 ## Dataset
 The dataset used for this work is publicly available in The Cancer Imaging Archive (TCIA):
